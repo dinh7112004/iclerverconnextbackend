@@ -6,6 +6,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bull';
+import { CacheModule } from '@nestjs/cache-manager';
+import { redisStore } from 'cache-manager-redis-yet';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { typeOrmConfig } from './config/typeorm.config';
@@ -52,6 +54,26 @@ import { GamesModule } from './modules/games/games.module';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: mongooseConfig,
+      inject: [ConfigService],
+    }),
+
+    // Caching
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => {
+        const redisUrl = configService.get('REDIS_URL');
+        if (redisUrl) {
+          return {
+            store: await redisStore({ url: redisUrl }),
+            ttl: 600000, // 10 minutes
+          };
+        }
+        return {
+          store: 'memory',
+          ttl: 300000, // 5 minutes
+        };
+      },
       inject: [ConfigService],
     }),
 

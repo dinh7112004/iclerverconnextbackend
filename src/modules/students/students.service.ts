@@ -1,10 +1,9 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { Repository } from 'typeorm';
 import { Student } from './entities/student.entity';
 import { StudentHealthInfo } from './entities/student-health-info.entity';
@@ -29,6 +28,7 @@ export class StudentsService {
     private parentRepository: Repository<Parent>,
     @InjectRepository(StudentParentRelation)
     private relationRepository: Repository<StudentParentRelation>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async create(createStudentDto: CreateStudentDto) {
@@ -181,65 +181,92 @@ export class StudentsService {
     if (!userId) {
       throw new BadRequestException('User ID is required');
     }
-    // 1. Check if the user is a student directly
-    let student = await this.studentRepository.findOne({
-      where: { userId },
-      relations: [
-        'user',
-        'currentClass',
-        'currentClass.homeroomTeacher',
-        'currentClass.grade',
-        'school',
-      ],
 
-    });
+    const cacheKey = `student_profile_user_${userId}`;
 
-    // 2. If not found, check if the user is a parent
-    if (!student) {
-      console.log(`[StudentsService] User ${userId} is not a student, checking if parent...`);
-      const parent = await this.parentRepository.findOne({
+    try {
+      // Try to get from cache first
+      const cachedProfile = await this.cacheManager.get(cacheKey);
+      if (cachedProfile) {
+        console.log(`[StudentsService] Returning CACHED profile for User ${userId}`);
+        return cachedProfile;
+      }
+
+      console.log(`[StudentsService] Fetching profile for User ${userId} (Cache MISS)`);
+      
+      // 1. Check if the user is a student directly
+      let student = await this.studentRepository.findOne({
         where: { userId },
+        relations: [
+          'user',
+          'currentClass',
+          'currentClass.homeroomTeacher',
+          'currentClass.grade',
+          'school',
+        ],
       });
 
-      if (parent) {
-        console.log(`[StudentsService] User ${userId} is Parent ${parent.id}. Finding children...`);
-        const relation = await this.relationRepository.findOne({
-          where: { parentId: parent.id },
-          order: { isPrimary: 'DESC' },
+      // 2. If not found, check if the user is a parent
+      if (!student) {
+        console.log(`[StudentsService] User ${userId} is not a student, checking if parent...`);
+        const parent = await this.parentRepository.findOne({
+          where: { userId },
         });
 
-        if (relation) {
-          console.log(`[StudentsService] Parent ${parent.id} linked to Student ${relation.studentId}`);
-          student = await this.studentRepository.findOne({
-            where: { id: relation.studentId },
-            relations: [
-              'user',
-              'currentClass',
-              'currentClass.homeroomTeacher',
-              'school',
-            ],
+        if (parent) {
+          console.log(`[StudentsService] User ${userId} is Parent ${parent.id}. Finding children...`);
+          const relation = await this.relationRepository.findOne({
+            where: { parentId: parent.id },
+            order: { isPrimary: 'DESC' },
           });
-        } else {
-          console.warn(`[StudentsService] Parent ${parent.id} has NO student relations!`);
+
+          if (relation) {
+            console.log(`[StudentsService] Parent ${parent.id} linked to Student ${relation.studentId}`);
+            student = await this.studentRepository.findOne({
+              where: { id: relation.studentId },
+              relations: [
+                'user',
+                'currentClass',
+                'currentClass.homeroomTeacher',
+                'currentClass.grade',
+                'school',
+              ],
+            });
+          }
         }
-      } else {
-        console.warn(`[StudentsService] User ${userId} is neither a student nor a parent record found.`);
       }
+
+      if (!student) {
+        console.warn(`[StudentsService] No student profile found for User ${userId}`);
+        throw new NotFoundException(`No student profile found for this account`);
+      }
+
+      // Get health info safely
+      let healthInfo = null;
+      try {
+        healthInfo = await this.healthInfoRepository.findOne({
+          where: { studentId: student.id },
+        });
+      } catch (healthErr) {
+        console.error(`[StudentsService] Error fetching health info for student ${student.id}:`, healthErr.message);
+      }
+
+      const result = {
+        ...student,
+        healthInfo,
+      };
+
+      // Save to cache
+      await this.cacheManager.set(cacheKey, result, 600000); // 10 minutes
+
+      return result;
+    } catch (error) {
+      console.error(`[StudentsService] Fatal error in findByUserId for ${userId}:`, error.stack);
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`Unable to retrieve profile: ${error.message}`);
     }
-
-    if (!student) {
-      throw new NotFoundException(`No student profile found for this account`);
-    }
-
-    // Get health info
-    const healthInfo = await this.healthInfoRepository.findOne({
-      where: { studentId: student.id },
-    });
-
-    return {
-      ...student,
-      healthInfo,
-    };
   }
 
   async update(id: string, updateStudentDto: UpdateStudentDto) {

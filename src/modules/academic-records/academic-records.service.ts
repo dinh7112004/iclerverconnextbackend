@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { Repository } from 'typeorm';
 import { Grade, GradeType, Semester } from './entities/grade.entity';
 import { AcademicSummary } from './entities/academic-summary.entity';
@@ -14,6 +16,7 @@ export class AcademicRecordsService {
     private gradeRepository: Repository<Grade>,
     @InjectRepository(AcademicSummary)
     private summaryRepository: Repository<AcademicSummary>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async create(createGradeDto: CreateGradeDto, enteredBy: string): Promise<Grade> {
@@ -220,6 +223,18 @@ export class AcademicRecordsService {
     subjects: any[];
     gpa: number;
   }> {
+    const cacheKey = `grade_report_${studentId}_${academicYearId}_${semester}`;
+    
+    try {
+      const cached = await this.cacheManager.get(cacheKey);
+      if (cached) {
+        console.log(`[AcademicRecords] Returning CACHED report for student ${studentId}`);
+        return cached as any;
+      }
+    } catch (err) {
+      console.warn(`[AcademicRecords] Cache lookup failed:`, err.message);
+    }
+
     const grades = await this.gradeRepository.find({
       where: {
         studentId,
@@ -230,7 +245,7 @@ export class AcademicRecordsService {
       relations: ['subject', 'student'],
     });
 
-    console.log(`[AcademicRecords] Found ${grades.length} grades for student ${studentId}`);
+    console.log(`[AcademicRecords] Found ${grades.length} grades for student ${studentId} (Cache MISS)`);
 
     // Group by subject
     const subjectMap = new Map();
@@ -261,7 +276,6 @@ export class AcademicRecordsService {
       });
 
       const average = totalCoefficient > 0 ? totalWeightedScore / totalCoefficient : 0;
-      console.log(`  - Subject ${subject.subjectName}: weighted=${totalWeightedScore.toFixed(2)}, coeff=${totalCoefficient}, avg=${average.toFixed(2)}`);
 
       return {
         subjectId: subject.subjectId,
@@ -277,15 +291,23 @@ export class AcademicRecordsService {
       totalAverage += subject.average;
     });
     const gpa = subjects.length > 0 ? totalAverage / subjects.length : 0;
-    console.log(`[AcademicRecords] Final GPA calculated: ${gpa.toFixed(2)}`);
 
-    return {
+    const result = {
       student: grades[0]?.student,
       academicYear: academicYearId,
       semester,
       subjects,
       gpa: Number(gpa.toFixed(2)),
     };
+
+    // Save to cache
+    try {
+      await this.cacheManager.set(cacheKey, result, 600000); // 10 minutes
+    } catch (err) {
+      console.warn(`[AcademicRecords] Cache save failed:`, err.message);
+    }
+
+    return result;
   }
 
   async getClassGradeReport(
