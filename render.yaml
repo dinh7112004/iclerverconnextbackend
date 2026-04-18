@@ -15,7 +15,7 @@ services:
           property: connectionString
       - key: REDIS_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: sll-redis
           property: connectionString
       - key: JWT_SECRET
@@ -25,11 +25,11 @@ services:
       - key: MONGODB_URI
         sync: false # Set this manually in the Render dashboard
 
+  - type: keyvalue
+    name: sll-redis
+    plan: free
+
 databases:
   - name: sll-db
     databaseName: sll_database
     user: sll_user
-
-distribCache:
-  - name: sll-redis
-    plan: free
