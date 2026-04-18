@@ -90,61 +90,66 @@ export class AttendanceService {
     page?: number;
     limit?: number;
   }): Promise<{ data: Attendance[]; total: number }> {
-    const { page = 1, limit = 50, startDate, endDate, ...rest } = filters;
-    const skip = (page - 1) * limit;
+    try {
+      const { page = 1, limit = 50, startDate, endDate, ...rest } = filters;
+      const skip = (page - 1) * limit;
 
-    const query = this.attendanceRepository.createQueryBuilder('attendance');
+      const query = this.attendanceRepository.createQueryBuilder('attendance');
 
-    if (filters.studentId) {
-      query.andWhere('attendance.studentId = :studentId', {
-        studentId: filters.studentId,
-      });
+      if (filters.studentId) {
+        query.andWhere('attendance.studentId = :studentId', {
+          studentId: filters.studentId,
+        });
+      }
+
+      if (filters.classId) {
+        query.andWhere('attendance.classId = :classId', {
+          classId: filters.classId,
+        });
+      }
+
+      if (filters.schoolId) {
+        query.andWhere('attendance.schoolId = :schoolId', {
+          schoolId: filters.schoolId,
+        });
+      }
+
+      if (filters.subjectId) {
+        query.andWhere('attendance.subjectId = :subjectId', {
+          subjectId: filters.subjectId,
+        });
+      }
+
+      if (filters.status) {
+        query.andWhere('attendance.status = :status', { status: filters.status });
+      }
+
+      if (startDate && endDate) {
+        query.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        });
+      } else if (startDate) {
+        query.andWhere('attendance.date >= :startDate', { startDate });
+      } else if (endDate) {
+        query.andWhere('attendance.date <= :endDate', { endDate });
+      }
+
+      query
+        .leftJoinAndSelect('attendance.student', 'student')
+        .leftJoinAndSelect('attendance.class', 'class')
+        .leftJoinAndSelect('attendance.subject', 'subject')
+        .orderBy('attendance.date', 'DESC')
+        .skip(skip)
+        .take(limit);
+
+      const [data, total] = await query.getManyAndCount();
+
+      return { data, total };
+    } catch (error) {
+      console.error(`[AttendanceService] Error in findAll: ${error.message}`);
+      return { data: [], total: 0 };
     }
-
-    if (filters.classId) {
-      query.andWhere('attendance.classId = :classId', {
-        classId: filters.classId,
-      });
-    }
-
-    if (filters.schoolId) {
-      query.andWhere('attendance.schoolId = :schoolId', {
-        schoolId: filters.schoolId,
-      });
-    }
-
-    if (filters.subjectId) {
-      query.andWhere('attendance.subjectId = :subjectId', {
-        subjectId: filters.subjectId,
-      });
-    }
-
-    if (filters.status) {
-      query.andWhere('attendance.status = :status', { status: filters.status });
-    }
-
-    if (startDate && endDate) {
-      query.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
-        startDate,
-        endDate,
-      });
-    } else if (startDate) {
-      query.andWhere('attendance.date >= :startDate', { startDate });
-    } else if (endDate) {
-      query.andWhere('attendance.date <= :endDate', { endDate });
-    }
-
-    query
-      .leftJoinAndSelect('attendance.student', 'student')
-      .leftJoinAndSelect('attendance.class', 'class')
-      .leftJoinAndSelect('attendance.subject', 'subject')
-      .orderBy('attendance.date', 'DESC')
-      .skip(skip)
-      .take(limit);
-
-    const [data, total] = await query.getManyAndCount();
-
-    return { data, total };
   }
 
   async findOne(id: string): Promise<Attendance> {
@@ -195,35 +200,47 @@ export class AttendanceService {
     excusedDays: number;
     attendanceRate: number;
   }> {
-    const query = this.attendanceRepository
-      .createQueryBuilder('attendance')
-      .where('attendance.studentId = :studentId', { studentId });
+    try {
+      const query = this.attendanceRepository
+        .createQueryBuilder('attendance')
+        .where('attendance.studentId = :studentId', { studentId });
 
-    if (startDate && endDate) {
-      query.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
-        startDate,
-        endDate,
-      });
+      if (startDate && endDate) {
+        query.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        });
+      }
+
+      const records = await query.getMany();
+
+      const totalDays = records.length;
+      const presentDays = records.filter((r) => r.status === AttendanceStatus.PRESENT).length;
+      const absentDays = records.filter((r) => r.status === AttendanceStatus.ABSENT).length;
+      const lateDays = records.filter((r) => r.status === AttendanceStatus.LATE).length;
+      const excusedDays = records.filter((r) => r.status === AttendanceStatus.EXCUSED).length;
+
+      const attendanceRate = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
+
+      return {
+        totalDays,
+        presentDays,
+        absentDays,
+        lateDays,
+        excusedDays,
+        attendanceRate: Number(attendanceRate.toFixed(2)),
+      };
+    } catch (error) {
+      console.error(`[AttendanceService] Error in getStudentAttendanceStats: ${error.message}`);
+      return {
+        totalDays: 0,
+        presentDays: 0,
+        absentDays: 0,
+        lateDays: 0,
+        excusedDays: 0,
+        attendanceRate: 0,
+      };
     }
-
-    const records = await query.getMany();
-
-    const totalDays = records.length;
-    const presentDays = records.filter((r) => r.status === AttendanceStatus.PRESENT).length;
-    const absentDays = records.filter((r) => r.status === AttendanceStatus.ABSENT).length;
-    const lateDays = records.filter((r) => r.status === AttendanceStatus.LATE).length;
-    const excusedDays = records.filter((r) => r.status === AttendanceStatus.EXCUSED).length;
-
-    const attendanceRate = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
-
-    return {
-      totalDays,
-      presentDays,
-      absentDays,
-      lateDays,
-      excusedDays,
-      attendanceRate: Number(attendanceRate.toFixed(2)),
-    };
   }
 
   async getClassAttendanceReport(
