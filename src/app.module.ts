@@ -65,7 +65,6 @@ import { GamesModule } from './modules/games/games.module';
         const redisUrl = configService.get('REDIS_URL');
         if (redisUrl) {
           try {
-            // Hiển thị log để debug trên Render
             console.log('Connecting to Redis Cache...');
             const store = await redisStore({
               url: redisUrl,
@@ -82,9 +81,10 @@ import { GamesModule } from './modules/games/games.module';
               },
             });
             console.log('Redis Cache connected successfully.');
+            // Cast to any to avoid TS union type mismatch between RedisStore and 'memory' string
             return {
               store,
-            };
+            } as any;
           } catch (error) {
             console.error('Failed to initialize Redis Cache:', error.message);
             console.log('Fallback to memory cache enabled.');
@@ -93,7 +93,7 @@ import { GamesModule } from './modules/games/games.module';
         return {
           store: 'memory',
           ttl: 300000, // 5 minutes
-        };
+        } as any;
       },
       inject: [ConfigService],
     }),
