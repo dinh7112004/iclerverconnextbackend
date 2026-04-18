@@ -91,9 +91,9 @@ import { GamesModule } from './modules/games/games.module';
             console.log('Redis Client connected.');
 
             const store = await redisStore({
-              commands: client as any,
+              redisInstance: client,
               ttl: 600000, // 10 minutes
-            });
+            } as any);
 
             console.log('Redis Cache Store initialized.');
             // Cast to any to avoid TS union type mismatch between RedisStore and 'memory' string
