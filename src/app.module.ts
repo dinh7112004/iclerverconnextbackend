@@ -64,10 +64,31 @@ import { GamesModule } from './modules/games/games.module';
       useFactory: async (configService: ConfigService) => {
         const redisUrl = configService.get('REDIS_URL');
         if (redisUrl) {
-          return {
-            store: await redisStore({ url: redisUrl }),
-            ttl: 600000, // 10 minutes
-          };
+          try {
+            // Hiển thị log để debug trên Render
+            console.log('Connecting to Redis Cache...');
+            const store = await redisStore({
+              url: redisUrl,
+              ttl: 600000, // 10 minutes
+              socket: {
+                reconnectStrategy: (retries) => {
+                  if (retries > 10) {
+                    console.error('Redis Max Retries Reached. Falling back.');
+                    return new Error('Redis connection failed');
+                  }
+                  return Math.min(retries * 100, 3000);
+                },
+                connectTimeout: 10000,
+              },
+            });
+            console.log('Redis Cache connected successfully.');
+            return {
+              store,
+            };
+          } catch (error) {
+            console.error('Failed to initialize Redis Cache:', error.message);
+            console.log('Fallback to memory cache enabled.');
+          }
         }
         return {
           store: 'memory',
