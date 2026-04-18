@@ -8,6 +8,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bull';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
+import { createClient } from 'redis';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { typeOrmConfig } from './config/typeorm.config';
@@ -65,10 +66,9 @@ import { GamesModule } from './modules/games/games.module';
         const redisUrl = configService.get('REDIS_URL');
         if (redisUrl) {
           try {
-            console.log('Connecting to Redis Cache...');
-            const store = await redisStore({
+            console.log('Developing Manual Redis Client...');
+            const client = createClient({
               url: redisUrl,
-              ttl: 600000, // 10 minutes
               socket: {
                 reconnectStrategy: (retries) => {
                   if (retries > 10) {
@@ -80,7 +80,22 @@ import { GamesModule } from './modules/games/games.module';
                 connectTimeout: 10000,
               },
             });
-            console.log('Redis Cache connected successfully.');
+
+            // CRITICAL: Attach error listener to prevent process exit on unhandled event
+            client.on('error', (err) => {
+              console.error('Redis Client Error Listener:', err.message);
+            });
+
+            console.log('Connecting to Redis...');
+            await client.connect();
+            console.log('Redis Client connected.');
+
+            const store = await redisStore({
+              commands: client as any,
+              ttl: 600000, // 10 minutes
+            });
+
+            console.log('Redis Cache Store initialized.');
             // Cast to any to avoid TS union type mismatch between RedisStore and 'memory' string
             return {
               store,
