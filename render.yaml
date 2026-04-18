@@ -28,6 +28,9 @@ services:
   - type: keyvalue
     name: sll-redis
     plan: free
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
 
 databases:
   - name: sll-db
