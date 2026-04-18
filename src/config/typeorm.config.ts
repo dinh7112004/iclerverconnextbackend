@@ -6,7 +6,13 @@ export const typeOrmConfig = (
   configService: ConfigService,
 ): TypeOrmModuleOptions => ({
   type: 'postgres',
-  url: configService.get('DATABASE_URL'),
+  url: (() => {
+    const url = configService.get('DATABASE_URL');
+    if (!url && configService.get('NODE_ENV') === 'production') {
+      console.error('❌ CRITICAL: DATABASE_URL is missing in production environment!');
+    }
+    return url;
+  })(),
   entities: [],
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
   synchronize: configService.get('NODE_ENV') === 'development',
