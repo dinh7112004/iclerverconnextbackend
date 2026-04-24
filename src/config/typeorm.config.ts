@@ -13,9 +13,9 @@ export const typeOrmConfig = (
     }
     return url;
   })(),
-  entities: [],
+  entities: [__dirname + '/../modules/**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
-  synchronize: true, // Ép tạo bảng tự động để sửa lỗi relation does not exist
+  synchronize: false,
   logging: false, // Tắt log SQL để terminal gọn hơn theo yêu cầu
   ssl: configService.get('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
   extra: {
