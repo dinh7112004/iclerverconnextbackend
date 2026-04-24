@@ -4,6 +4,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Model } from 'mongoose';
 import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
+import { Student } from '../students/entities/student.entity';
+import { Subject } from '../subjects/entities/subject.entity';
+import { Teacher } from '../teachers/entities/teacher.entity';
 import {
   Course,
   Lesson,
@@ -38,6 +41,9 @@ export class LMSService {
     @InjectModel(Quiz.name) private quizModel: Model<Quiz>,
     @InjectModel(QuizAttempt.name) private attemptModel: Model<QuizAttempt>,
     @InjectRepository(User) private userRepository: Repository<User>,
+    @InjectRepository(Student) private studentRepository: Repository<Student>,
+    @InjectRepository(Subject) private subjectRepository: Repository<Subject>,
+    @InjectRepository(Teacher) private teacherRepository: Repository<Teacher>,
   ) {}
 
   // ==================== COURSE MANAGEMENT ====================
@@ -412,6 +418,7 @@ export class LMSService {
     dueDate: Date;
     createdBy: string;
     allowedSubmissionTypes?: string[];
+    allowLateSubmission?: boolean;
     rubric?: any;
   }): Promise<Assignment> {
     const course = await this.getCourse(data.courseId);
@@ -420,6 +427,7 @@ export class LMSService {
       ...data,
       courseName: course.name,
       status: AssignmentStatus.DRAFT,
+      allowLateSubmission: data.allowLateSubmission ?? false,
       submissionCount: 0,
       gradedCount: 0,
       averageScore: 0,
@@ -570,6 +578,86 @@ export class LMSService {
 
     this.logger.log(`Graded submission: ${submissionId}`);
     return submission;
+  }
+
+  async getAssignmentsByClass(classId: string): Promise<any[]> {
+    const courses = await this.courseModel.find({ classIds: { $in: [classId] }, status: CourseStatus.PUBLISHED });
+    const courseIds = courses.map(c => c._id.toString());
+    
+    const assignments = await this.assignmentModel.find({ 
+      courseId: { $in: courseIds }, 
+      status: AssignmentStatus.PUBLISHED 
+    }).sort({ dueDate: -1 });
+
+    // Enrich with Subject and Teacher info
+    const enrichedAssignments = await Promise.all(assignments.map(async (assignment) => {
+      const course = courses.find(c => c._id.toString() === assignment.courseId);
+      
+      if (!course) {
+        return {
+          _id: assignment._id,
+          title: assignment.title,
+          description: assignment.description,
+          deadLine: assignment.dueDate,
+          createdAt: (assignment as any).createdAt,
+          subject: { name: 'Môn học', color: '#3498db', icon: 'book' },
+          teacher: { fullName: 'Giáo viên' }
+        };
+      }
+
+      const subject = await this.subjectRepository.findOne({ where: { id: course.subjectId } });
+      const teacher = await this.teacherRepository.findOne({ where: { id: course.teacherId } });
+
+      return {
+        _id: assignment._id,
+        title: assignment.title,
+        description: assignment.description,
+        deadLine: assignment.dueDate,
+        subject: subject ? {
+          _id: subject.id,
+          name: subject.name,
+          color: subject.color || '#3498db',
+          icon: subject.icon || 'book'
+        } : {
+          _id: course.subjectId,
+          name: course.subjectName || 'Môn học',
+          color: '#3498db',
+          icon: 'book'
+        },
+        teacher: {
+          fullName: teacher?.fullName || course.teacherName || 'Giáo viên'
+        },
+        createdAt: (assignment as any).createdAt,
+      };
+    }));
+
+    return enrichedAssignments;
+  }
+
+  async getSubmissionsByStudent(studentId: string): Promise<any[]> {
+    let resolvedStudentId = studentId;
+
+    // Safety: If studentId looks like a UUID (Postgres ID) but could be a UserId,
+    // we should try to find the Student record first. 
+    // In our system, studentId in Mongo always stores the fa711... (Student PK), 
+    // but the App might pass the 6515... (User PK) if profile is not loaded.
+    const student = await this.studentRepository.findOne({
+      where: [{ id: studentId }, { userId: studentId }]
+    });
+    
+    if (student) {
+      resolvedStudentId = student.id;
+    }
+
+    const submissions = await this.submissionModel.find({ studentId: resolvedStudentId }).sort({ submittedAt: -1 }).lean();
+    return (submissions as any[]).map(s => ({
+      _id: s._id,
+      homework: s.assignmentId,
+      status: s.status,
+      myGrade: s.score,
+      teacherFeedback: s.feedback || 'API Test',
+      submittedAt: s.submittedAt
+    }));
   }
 
   // ==================== QUIZ MANAGEMENT ====================
@@ -1023,5 +1111,9 @@ export class LMSService {
         averageScore: quizzes.reduce((sum, q) => sum + q.averageScore, 0) / (quizzes.length || 1),
       },
     };
+  }
+
+  async getStudentByUser(userId: string): Promise<Student> {
+    return this.studentRepository.findOne({ where: { userId } });
   }
 }

@@ -58,6 +58,15 @@ export class Student {
   @Column({ length: 50, default: 'Việt Nam' })
   nationality: string;
 
+  @Column({ length: 20, nullable: true })
+  citizenId: string;
+
+  @Column({ type: 'date', nullable: true })
+  citizenIdIssuedAt: Date;
+
+  @Column({ length: 100, nullable: true })
+  citizenIdIssuedPlace: string;
+
   @Column({ length: 100, nullable: true })
   birthplace: string;
 

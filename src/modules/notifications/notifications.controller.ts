@@ -10,7 +10,9 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   ApiTags,
   ApiOperation,
@@ -20,10 +22,11 @@ import {
 } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { NotificationsGateway } from './notifications.gateway';
-import { NotificationStatus, NotificationType } from './entities/notification.entity';
+import { NotificationStatus, NotificationType, Notification } from './entities/notification.entity';
 
 @ApiTags('Notifications')
 @Controller('notifications')
+@UseGuards(JwtAuthGuard)
 export class NotificationsController {
   constructor(
     private readonly notificationsService: NotificationsService,
@@ -36,12 +39,14 @@ export class NotificationsController {
   @ApiQuery({ name: 'type', required: false, enum: NotificationType })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'skip', required: false, type: Number })
+  @ApiQuery({ name: 'classId', required: false, type: String })
   async getNotifications(
     @Request() req: any,
     @Query('status') status?: NotificationStatus,
     @Query('type') type?: NotificationType,
     @Query('limit') limit?: string,
     @Query('skip') skip?: string,
+    @Query('classId') classId?: string,
   ) {
     const userId = req.user?.id || 'anonymous';
     return this.notificationsService.findByUser(userId, {
@@ -49,6 +54,7 @@ export class NotificationsController {
       type,
       limit: limit ? parseInt(limit) : undefined,
       skip: skip ? parseInt(skip) : undefined,
+      classId,
     });
   }
 
@@ -71,6 +77,42 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Lấy chi tiết một thông báo' })
   async getNotification(@Param('id') id: string) {
     return this.notificationsService.findById(id);
+  }
+
+  @Post(':id/like')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Thả/Bỏ tim thông báo/hoạt động' })
+  async toggleLike(@Param('id') id: string, @Request() req: any) {
+    const userId = req.user?.id || 'anonymous';
+    const notification = await this.notificationsService.toggleLike(id, userId);
+
+    if (notification) {
+      this.notificationsGateway.sendNotificationToUser(userId, notification);
+    }
+
+    return notification;
+  }
+
+  @Post(':id/comment')
+  @ApiOperation({ summary: 'Gửi bình luận vào thông báo/hoạt động' })
+  async addComment(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: { content: string; userName?: string; userAvatar?: string; userRole?: string },
+  ) {
+    const userProfile = req.user || {};
+    const userId = userProfile.id || 'anonymous';
+    
+    const notification = await this.notificationsService.addComment(
+      id, 
+      userId, 
+      body.content,
+      body.userName || userProfile.fullName,
+      body.userAvatar || userProfile.avatarUrl,
+      body.userRole || userProfile.role,
+    );
+
+    return notification;
   }
 
   @Put(':id/read')

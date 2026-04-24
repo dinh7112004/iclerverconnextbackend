@@ -3,10 +3,13 @@
  * Manage messages between parents, teachers, and admins
  */
 
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Message, MessageType, MessageStatus } from './entities/message.entity';
+import { Teacher } from '../teachers/entities/teacher.entity';
+import { User } from '../users/entities/user.entity';
+import { UserRole } from '../../common/enums/role.enum';
 
 export interface CreateMessageDto {
   senderId: string;
@@ -41,7 +44,85 @@ export class MessagingService {
   constructor(
     @InjectRepository(Message)
     private messageRepository: Repository<Message>,
+    @InjectRepository(Teacher)
+    private teacherRepository: Repository<Teacher>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
+
+  async onModuleInit() {
+    console.log('[MessagingService] Initializing messages...');
+    // Seed disabled by request to use real data
+    /*
+    const count = await this.messageRepository.count();
+    if (count === 0) {
+      console.log('[MessagingService] No messages found, seeding...');
+      await this.seedMessages();
+    } else {
+      console.log(`[MessagingService] Found ${count} messages, skipping seed.`);
+    }
+    */
+  }
+
+  private async seedMessages() {
+    const teachers = await this.teacherRepository.find({ relations: ['user'] });
+    // Find ALL parents and seed for each of them to ensure the current user has data
+    const parents = await this.userRepository.find({ where: { role: UserRole.PARENT } });
+    
+    console.log(`[MessagingService] Found ${teachers.length} teachers and ${parents.length} parents.`);
+
+    if (teachers.length === 0 || parents.length === 0) {
+      console.warn('[MessagingService] Seeding failed: Missing teachers or parents');
+      return;
+    }
+
+    const teacher = teachers[0];
+    
+    for (const parent of parents) {
+      console.log(`[MessagingService] Seeding messages for parent: ${parent.fullName} (${parent.id})`);
+      const messages = [
+        {
+          senderId: teacher.user.id,
+          recipientId: parent.id,
+          subject: 'Học tập của Minh Anh',
+          body: 'Chào phụ huynh em Minh Anh.',
+          created_at: new Date(Date.now() - 3600000 * 2),
+        },
+        {
+          senderId: teacher.user.id,
+          recipientId: parent.id,
+          subject: 'Học tập của Minh Anh',
+          body: 'Em Minh Anh dạo này học tập rất tiến bộ.',
+          created_at: new Date(Date.now() - 3600000 * 1.9),
+        },
+        {
+          senderId: parent.id,
+          recipientId: teacher.user.id,
+          subject: 'Re: Học tập của Minh Anh',
+          body: 'Cảm ơn cô ạ. Cháu về nhà cũng rất chịu khó làm bài tập.',
+          created_at: new Date(Date.now() - 3600000 * 0.5),
+        },
+        {
+          senderId: teacher.user.id,
+          recipientId: parent.id,
+          subject: 'Re: Học tập của Minh Anh',
+          body: 'Dạ vâng, tôi sẽ lưu ý nhắc nhở cháu thêm ạ.',
+          created_at: new Date(),
+        }
+      ];
+
+      for (const msg of messages) {
+        const message = this.messageRepository.create({
+          ...msg,
+          messageType: MessageType.DIRECT,
+          status: MessageStatus.SENT,
+          isRead: false,
+        });
+        await this.messageRepository.save(message);
+      }
+    }
+    console.log('[MessagingService] Seeding complete.');
+  }
 
   /**
    * Send a new message
@@ -183,7 +264,7 @@ export class MessagingService {
       .orderBy('message.created_at', 'ASC');
 
     if (studentId) {
-      queryBuilder.andWhere('message.student_id = :studentId', { studentId });
+      queryBuilder.andWhere('(message.student_id = :studentId OR message.student_id IS NULL)', { studentId });
     }
 
     return await queryBuilder.getMany();
@@ -228,5 +309,43 @@ export class MessagingService {
       parentMessageId,
       messageType: parentMessage.messageType,
     });
+  }
+
+  /**
+   * Get unique conversation threads for a user
+   */
+  async getThreads(userId: string): Promise<any[]> {
+    // This is a simplified version using subqueries or distinct logic
+    // For a real app, you might want a separate Threads table or more complex aggregation
+    const messages = await this.messageRepository
+      .createQueryBuilder('message')
+      .leftJoinAndSelect('message.sender', 'sender')
+      .leftJoinAndSelect('message.recipient', 'recipient')
+      .where('message.sender_id = :userId OR message.recipient_id = :userId', { userId })
+      .orderBy('message.created_at', 'DESC')
+      .getMany();
+
+    const threadsMap = new Map();
+
+    messages.forEach(msg => {
+      const otherUser = msg.senderId === userId ? msg.recipient : msg.sender;
+      if (!otherUser) return;
+      
+      if (!threadsMap.has(otherUser.id)) {
+        threadsMap.set(otherUser.id, {
+          id: otherUser.id,
+          user: otherUser,
+          lastMessage: msg,
+          unreadCount: 0,
+        });
+      }
+      
+      if (!msg.isRead && msg.recipientId === userId) {
+        const thread = threadsMap.get(otherUser.id);
+        thread.unreadCount++;
+      }
+    });
+
+    return Array.from(threadsMap.values());
   }
 }

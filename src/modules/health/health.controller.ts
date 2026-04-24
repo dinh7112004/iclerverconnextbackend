@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
@@ -20,23 +21,24 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
+  // --- NOTES ---
   @Get('notes/student/:studentId')
   @ApiOperation({ summary: "Get all health notes for a student" })
-  async findAll(@Param('studentId', ParseUUIDPipe) studentId: string) {
+  async findAllNotes(@Param('studentId', ParseUUIDPipe) studentId: string) {
     const data = await this.healthService.findAllByStudent(studentId);
     return { data };
   }
 
   @Post('notes')
   @ApiOperation({ summary: "Create a new health note" })
-  async create(@Body() createDto: CreateHealthNoteDto) {
+  async createNote(@Body() createDto: CreateHealthNoteDto) {
     const data = await this.healthService.create(createDto);
     return { data };
   }
 
   @Delete('notes/:id')
   @ApiOperation({ summary: "Delete a health note" })
-  async remove(@Param('id', ParseUUIDPipe) id: string) {
+  async removeNote(@Param('id', ParseUUIDPipe) id: string) {
     await this.healthService.remove(id);
     return { message: 'Note deleted successfully' };
   }
@@ -46,5 +48,20 @@ export class HealthController {
   async getNotice() {
     const data = await this.healthService.getSchoolNotice();
     return { data };
+  }
+
+  // --- MEDICINES ---
+  @Get('medicines')
+  @ApiOperation({ summary: "Get all medicine instructions for a student" })
+  async findAllMedicines(@Query('studentId', ParseUUIDPipe) studentId: string) {
+    const data = await this.healthService.findAllMedicinesByStudent(studentId);
+    return { data };
+  }
+
+  @Post('medicines')
+  @ApiOperation({ summary: "Create a new medicine instruction" })
+  async createMedicine(@Body() data: any) {
+    const response = await this.healthService.createMedicine(data);
+    return { data: response };
   }
 }

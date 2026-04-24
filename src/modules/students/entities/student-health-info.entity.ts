@@ -44,6 +44,18 @@ export class StudentHealthInfo {
   @Column({ length: 20, nullable: true })
   emergencyContact: string;
 
+  @Column({ length: 20, nullable: true })
+  vision: string;
+
+  @Column({ length: 50, nullable: true })
+  insuranceId: string;
+
+  @Column({ type: 'text', nullable: true })
+  importantNote: string;
+
+  @Column({ length: 100, nullable: true })
+  lastCheckup: string;
+
   @Column({ type: 'text', nullable: true })
   doctorNotes: string;
 

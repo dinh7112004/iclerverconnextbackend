@@ -15,6 +15,7 @@ import {
   UseGuards,
   HttpStatus,
   HttpCode,
+  Req,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -27,18 +28,22 @@ import {
   GetMenusQuery,
 } from './nutrition.service';
 import { MealType } from './entities/menu.entity';
+import { StudentsService } from '../students/students.service';
 
 @Controller('nutrition')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class NutritionController {
-  constructor(private readonly nutritionService: NutritionService) {}
+  constructor(
+    private readonly nutritionService: NutritionService,
+    private readonly studentsService: StudentsService,
+  ) {}
 
   /**
    * Create a new menu entry
    * POST /nutrition/menus
    */
   @Post('menus')
-  @Roles(UserRole.SCHOOL_ADMIN, UserRole.TEACHER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.TEACHER)
   @HttpCode(HttpStatus.CREATED)
   async createMenu(@Body() createMenuDto: CreateMenuDto) {
     const menu = await this.nutritionService.createMenu(createMenuDto);
@@ -67,6 +72,31 @@ export class NutritionController {
       data: menus,
       message: 'Menus retrieved successfully',
     };
+  }
+
+  /**
+   * Get grouped weekly menu for the current student
+   * GET /nutrition/menus/current-week
+   */
+  @Get('menus/current-week')
+  @Roles(UserRole.PARENT, UserRole.STUDENT, UserRole.TEACHER)
+  async getCurrentWeekMenu(@Req() req: any) {
+    try {
+      const student: any = await this.studentsService.findByUserId(req.user.id);
+      const menus = await this.nutritionService.getGroupedWeeklyMenu(student.schoolId);
+      return {
+        success: true,
+        data: menus,
+        message: 'Current week menu retrieved successfully',
+      };
+    } catch (error) {
+      // Fallback for users without student profile (admin, teacher) - provide sample or empty
+      return {
+        success: true,
+        data: [],
+        message: 'No student profile found for menu context',
+      };
+    }
   }
 
   /**
@@ -159,4 +189,5 @@ export class NutritionController {
       message: `${createdMenus.length} menus created successfully`,
     };
   }
+
 }

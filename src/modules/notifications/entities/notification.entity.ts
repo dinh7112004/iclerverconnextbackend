@@ -14,6 +14,8 @@ export enum NotificationType {
   EXAM_SCHEDULED = 'exam_scheduled',
   REPORT_READY = 'report_ready',
   SYSTEM_ALERT = 'system_alert',
+  NEWS = 'news',
+  ACTIVITY = 'activity',
 }
 
 export enum NotificationPriority {
@@ -32,7 +34,7 @@ export enum NotificationStatus {
 @Schema({ timestamps: true })
 export class Notification extends Document {
   @Prop({ required: true })
-  userId: string;
+  userId: string; // The target user (for individual notifications) or 'all' for broadcasts
 
   @Prop({ required: true, enum: NotificationType })
   type: NotificationType;
@@ -57,8 +59,34 @@ export class Notification extends Document {
     imageUrl?: string;
     actionLabel?: string;
     actionUrl?: string;
+    classId?: string; // Target specific class
+    schoolId?: string; // Target specific school
     [key: string]: any;
   };
+
+  @Prop({ type: [String], default: [] })
+  likes: string[]; // List of user IDs who liked this
+
+  @Prop({
+    type: [
+      {
+        userId: String,
+        userName: String,
+        userAvatar: String,
+        content: String,
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+  })
+  comments: {
+    userId: string;
+    userName?: string;
+    userAvatar?: string;
+    userRole?: string;
+    content: string;
+    createdAt: Date;
+  }[];
 
   @Prop()
   readAt?: Date;

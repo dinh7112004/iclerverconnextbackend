@@ -189,11 +189,16 @@ export class StudentsService {
     const cacheKey = `student_profile_user_${userId}`;
 
     try {
-      // Try to get from cache first
-      const cachedProfile = await this.cacheManager.get(cacheKey);
-      if (cachedProfile) {
-        console.log(`[StudentsService] Returning CACHED profile for User ${userId}`);
-        return cachedProfile;
+      // Try to get from cache first (Safely)
+      try {
+        const cachedProfile = await this.cacheManager.get(cacheKey);
+        if (cachedProfile) {
+          console.log(`[StudentsService] Returning CACHED profile for User ${userId}`);
+          return cachedProfile;
+        }
+      } catch (cacheErr) {
+        console.warn(`[StudentsService] Cache GET failed for User ${userId}:`, cacheErr.message);
+        // Continue to DB if cache fails
       }
 
       console.log(`[StudentsService] Fetching profile for User ${userId} (Cache MISS)`);
@@ -255,13 +260,35 @@ export class StudentsService {
         console.error(`[StudentsService] Error fetching health info for student ${student.id}:`, healthErr.message);
       }
 
+      // Get parent relations safely
+      let parents = [];
+      try {
+        const parentRelations = await this.relationRepository.find({
+          where: { studentId: student.id },
+          relations: ['parent', 'parent.user'],
+        });
+        parents = parentRelations.map((rel) => ({
+          ...rel.parent,
+          relationship: rel.relationship,
+          isPrimary: rel.isPrimary,
+          isEmergencyContact: rel.isEmergencyContact,
+        }));
+      } catch (parentErr) {
+        console.error(`[StudentsService] Error fetching parents for student ${student.id}:`, parentErr.message);
+      }
+
       const result = {
         ...student,
         healthInfo,
+        parents,
       };
 
-      // Save to cache
-      await this.cacheManager.set(cacheKey, result, 600000); // 10 minutes
+      // Safely save to cache
+      try {
+        await this.cacheManager.set(cacheKey, result, 600000); // 10 minutes
+      } catch (cacheErr) {
+        console.warn(`[StudentsService] Cache SET failed for User ${userId}:`, cacheErr.message);
+      }
 
       return result;
     } catch (error) {
@@ -269,6 +296,8 @@ export class StudentsService {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
+      
+      // FALLBACK: If everything failed (maybe DB error), but we are here, throw something meaningful
       throw new BadRequestException(`Unable to retrieve profile: ${error.message}`);
     }
   }
@@ -289,6 +318,20 @@ export class StudentsService {
 
     await this.studentRepository.save(student);
 
+    // Sync avatarUrl to User entity if it was updated
+    if (updateStudentDto.avatarUrl) {
+      await this.userRepository.update(student.userId, {
+        avatarUrl: updateStudentDto.avatarUrl,
+      });
+    }
+
+    // Invalidate cache
+    try {
+      await this.cacheManager.del(`student_profile_user_${student.userId}`);
+    } catch (err) {
+      console.warn(`[StudentsService] Failed to invalidate cache for User ${student.userId}`);
+    }
+
     // Update health info if provided
     if (updateStudentDto.healthInfo) {
       let healthInfo = await this.healthInfoRepository.findOne({
@@ -304,6 +347,38 @@ export class StudentsService {
           ...updateStudentDto.healthInfo,
         });
         await this.healthInfoRepository.save(healthInfo);
+      }
+    }
+
+    // Update parent info if provided
+    const parentUpdates = [
+      { data: updateStudentDto.father, relationship: 'Cha' },
+      { data: updateStudentDto.mother, relationship: 'Mẹ' },
+      { data: updateStudentDto.guardian, relationship: 'Người giám hộ' },
+    ];
+
+    for (const { data, relationship } of parentUpdates) {
+      if (!data) continue;
+
+      // Find relation to get parent ID
+      const relation = await this.relationRepository.findOne({
+        where: { studentId: id, relationship },
+        relations: ['parent'],
+      });
+
+      if (relation && relation.parent) {
+        const parent = relation.parent;
+        if (data.name) {
+          parent.fullName = data.name;
+          parent.firstName = data.name.split(' ').pop() || '';
+          parent.lastName = data.name.split(' ').slice(0, -1).join(' ');
+        }
+        if (data.phone) parent.phone = data.phone;
+        if (data.email) parent.email = data.email;
+        if (data.occupation) parent.occupation = data.occupation;
+        if (data.workplace) parent.workplace = data.workplace;
+
+        await this.parentRepository.save(parent);
       }
     }
 

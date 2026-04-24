@@ -44,6 +44,34 @@ class HealthInfoDto {
   @IsString()
   bloodType?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  height?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  weight?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  vision?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  insuranceId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  importantNote?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  lastCheckup?: string;
+
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()
@@ -80,6 +108,11 @@ export class CreateStudentDto {
   @MaxLength(50)
   lastName: string;
 
+  @ApiProperty({ example: 'Nguyễn Văn A' })
+  @IsOptional()
+  @IsString()
+  fullName?: string;
+
   @ApiProperty({ example: '2015-05-20' })
   @IsDateString()
   dateOfBirth: string;
@@ -101,6 +134,21 @@ export class CreateStudentDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  citizenId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  citizenIdIssuedAt?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  citizenIdIssuedPlace?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   birthplace?: string;
 
   @ApiPropertyOptional()
@@ -117,6 +165,11 @@ export class CreateStudentDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
 
   @ApiProperty()
   @IsUUID()

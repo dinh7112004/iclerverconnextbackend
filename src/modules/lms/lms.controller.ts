@@ -9,6 +9,8 @@ import {
   Query,
   UseGuards,
   Req,
+  Version,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { LMSService } from './lms.service';
@@ -252,6 +254,26 @@ export class LMSController {
 
   // ==================== ASSIGNMENT ENDPOINTS ====================
 
+  @Get('assignments')
+  @ApiOperation({ summary: 'Lấy danh sách bài tập của lớp' })
+  async getAssignments(@Query('classId') classId: string) {
+    const data = await this.lmsService.getAssignmentsByClass(classId);
+    return {
+      success: true,
+      data: data
+    };
+  }
+
+  @Get('submissions')
+  @ApiOperation({ summary: 'Lấy danh sách bài nộp của học sinh' })
+  async getSubmissions(@Query('studentId') studentId: string) {
+    const data = await this.lmsService.getSubmissionsByStudent(studentId);
+    return {
+      success: true,
+      data: data
+    };
+  }
+
   @Post('assignments')
   @ApiOperation({ summary: 'Tạo bài tập mới' })
   async createAssignment(
@@ -288,18 +310,37 @@ export class LMSController {
     @Param('id') assignmentId: string,
     @Body()
     body: {
-      studentId: string;
-      studentName: string;
+      studentId?: string;
+      studentName?: string;
       files?: any[];
       textContent?: string;
       linkUrl?: string;
       codeContent?: string;
       codeLanguage?: string;
     },
+    @Req() req: any,
   ) {
+    let studentId = body.studentId;
+    let studentName = body.studentName;
+
+    // Nếu không có studentId trong body, tự động lấy từ user profile
+    if (!studentId && req.user?.id) {
+      const student = await this.lmsService.getStudentByUser(req.user.id);
+      if (student) {
+        studentId = student.id;
+        studentName = student.fullName;
+      }
+    }
+
+    if (!studentId) {
+      throw new BadRequestException('Không tìm thấy thông tin học sinh');
+    }
+
     return this.lmsService.submitAssignment({
       assignmentId,
       ...body,
+      studentId,
+      studentName,
     });
   }
 

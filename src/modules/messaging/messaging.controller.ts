@@ -171,4 +171,18 @@ export class MessagingController {
   async deleteMessage(@Param('id') id: string, @Request() req) {
     await this.messagingService.deleteMessage(id, req.user.id);
   }
+
+  /**
+   * Get all conversation threads for current user
+   * GET /messaging/threads
+   */
+  @Get('threads')
+  async getThreads(@Request() req) {
+    const threads = await this.messagingService.getThreads(req.user.id);
+    return {
+      success: true,
+      data: threads,
+      message: 'Threads retrieved successfully',
+    };
+  }
 }

@@ -131,6 +131,15 @@ export class PaymentsController {
     @Query('limit') limit?: string,
     @Query('skip') skip?: string,
   ) {
+    // Nếu có studentId, trả về bảng kê học phí tổng hợp cho màn hình "Học phí"
+    if (studentId && !invoiceId) {
+      const statement = await this.paymentsService.getTuitionStatement(studentId);
+      return {
+        success: true,
+        data: statement,
+      };
+    }
+
     return this.paymentsService.findPayments({
       invoiceId,
       studentId,

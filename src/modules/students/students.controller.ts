@@ -107,6 +107,17 @@ export class StudentsController {
     return this.studentsService.findOne(id);
   }
 
+  @Patch('me')
+  @Roles(UserRole.PARENT, UserRole.STUDENT)
+  @ApiOperation({ summary: 'Update own student profile' })
+  async updateMe(
+    @CurrentUser('id') userId: string,
+    @Body() updateStudentDto: UpdateStudentDto,
+  ) {
+    const student: any = await this.studentsService.findByUserId(userId);
+    return this.studentsService.update(student.id, updateStudentDto);
+  }
+
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.TEACHER)
   @ApiOperation({ summary: 'Update student' })

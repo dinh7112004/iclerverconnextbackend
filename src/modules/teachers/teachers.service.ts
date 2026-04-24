@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -30,6 +31,33 @@ export class TeachersService {
     @InjectRepository(Schedule)
     private scheduleRepository: Repository<Schedule>,
   ) {}
+
+  async onModuleInit() {
+    const count = await this.teacherRepository.count();
+    if (count === 0) {
+      await this.seedTeachers();
+    }
+  }
+
+  private async seedTeachers() {
+    const school = await this.schoolRepository.findOne({ where: {} });
+    if (!school) return;
+
+    const teacherData = [
+      { firstName: 'Thu', lastName: 'Trần Thị', email: 'thu.tt@school.vn', phone: '0912345678', specialization: 'Giáo viên Chủ nhiệm' },
+      { firstName: 'Sarah', lastName: 'Ms.', email: 'sarah@school.vn', phone: '0912345679', specialization: 'Giáo viên Tiếng Anh' },
+      { firstName: 'Nam', lastName: 'Nguyễn Văn', email: 'nam.nv@school.vn', phone: '0912345680', specialization: 'Giáo viên Toán' },
+    ];
+
+    for (const data of teacherData) {
+      await this.create({
+        ...data,
+        schoolId: school.id,
+        gender: 'female',
+        status: 'active',
+      } as any);
+    }
+  }
 
   async create(createTeacherDto: CreateTeacherDto) {
     // Verify school exists

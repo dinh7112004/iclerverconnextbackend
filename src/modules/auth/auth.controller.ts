@@ -65,6 +65,23 @@ export class AuthController {
     };
   }
 
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change user password' })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid old password' })
+  async changePassword(
+    @CurrentUser('id') userId: string,
+    @Body() changePasswordDto: any,
+  ) {
+    return this.authService.changePassword(
+      userId,
+      changePasswordDto.oldPassword,
+      changePasswordDto.newPassword,
+    );
+  }
+
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -74,5 +91,17 @@ export class AuthController {
   async logout(@CurrentUser() user: User) {
     // TODO: Implement token blacklisting or revocation
     return;
+  }
+
+  @Public()
+  @Get('test-accounts')
+  @ApiOperation({ summary: 'Get test accounts for easy login testing (2 students/parents per class)' })
+  @ApiResponse({ status: 200, description: 'List of test accounts' })
+  async getTestAccounts() {
+    const accounts = await this.authService.getTestAccounts();
+    return {
+      success: true,
+      data: accounts,
+    };
   }
 }

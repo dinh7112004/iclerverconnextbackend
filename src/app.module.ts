@@ -32,6 +32,11 @@ import { MessagingModule } from './modules/messaging/messaging.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { HealthModule } from './modules/health/health.module';
 import { GamesModule } from './modules/games/games.module';
+import { TransportationModule } from './modules/transportation/transportation.module';
+import { LeaveRequestsModule } from './modules/leave-requests/leave-requests.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
+import { LibraryModule } from './modules/library/library.module';
+import { SurveysModule } from './modules/surveys/surveys.module';
 
 @Module({
   imports: [
@@ -162,6 +167,11 @@ import { GamesModule } from './modules/games/games.module';
     ReportsModule,
     HealthModule,
     GamesModule,
+    TransportationModule,
+    LeaveRequestsModule,
+    UploadsModule,
+    LibraryModule,
+    SurveysModule,
   ],
   controllers: [AppController],
   providers: [AppService],

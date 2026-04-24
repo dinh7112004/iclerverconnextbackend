@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   Notification,
@@ -8,6 +8,14 @@ import {
   NotificationPriority,
   NotificationStatus,
 } from './entities/notification.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Student } from '../students/entities/student.entity';
+import { User } from '../users/entities/user.entity';
+import { UserRole } from '../../common/enums/role.enum';
+import { Class } from '../classes/entities/class.entity';
+import { Parent } from '../parents/entities/parent.entity';
+import { StudentParentRelation } from '../parents/entities/student-parent-relation.entity';
 
 export interface CreateNotificationDto {
   userId: string;
@@ -29,7 +37,158 @@ export class NotificationsService {
   constructor(
     @InjectModel(Notification.name)
     private notificationModel: Model<Notification>,
-  ) {}
+    @InjectRepository(Student)
+    private studentRepository: Repository<Student>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    @InjectRepository(Class)
+    private classRepository: Repository<Class>,
+    @InjectRepository(Parent)
+    private parentRepository: Repository<Parent>,
+    @InjectRepository(StudentParentRelation)
+    private relationRepository: Repository<StudentParentRelation>,
+  ) { }
+
+  async onModuleInit() {
+    try {
+      // 1. Only seed if no global news/activities exist to prevent overwriting user data
+      const globalCount = await this.notificationModel.countDocuments({ userId: 'all' });
+      if (globalCount > 0) {
+        this.logger.log('📢 Global notifications already exist, skipping seed.');
+        return;
+      }
+      
+      const parents = await this.userRepository.find({ 
+        where: { role: UserRole.PARENT },
+        take: 10 // Chỉ seed cho 10 phụ huynh để khởi động nhanh
+      });
+      if (parents.length === 0) return;
+
+      this.logger.log(`🌱 Seeding rich notifications for ${parents.length} parents...`);
+      const seeds = [];
+      
+      for (const parentUser of parents) {
+        // Find children for this parent
+        const parentProfile = await this.parentRepository.findOne({ where: { userId: parentUser.id } });
+        if (!parentProfile) continue;
+
+        const relations = await this.relationRepository.find({ 
+          where: { parentId: parentProfile.id },
+          relations: ['student'] 
+        });
+
+        for (const relation of relations) {
+          const studentName = relation.student?.fullName || 'Con';
+          
+          // 2. Urgent Notifications (Personalized with student name)
+          seeds.push({
+            userId: parentUser.id,
+            type: NotificationType.ANNOUNCEMENT,
+            title: 'Hệ thống điểm danh',
+            message: `⚠️ BÉ ${studentName.toUpperCase()} VẮNG MẶT KHÔNG PHÉP\n\nHệ thống ghi nhận học sinh vắng mặt tại buổi điểm danh sáng. Phụ huynh vui lòng kiểm tra.`,
+            priority: NotificationPriority.URGENT,
+            status: NotificationStatus.UNREAD,
+            data: {
+              sourceName: 'Hệ thống điểm danh',
+              sourceIcon: 'warning-outline',
+              badge: 'KHẨN CẤP',
+              time: '08:00',
+              date: '12/09/2023',
+            },
+            createdAt: new Date(),
+          });
+
+          seeds.push({
+            userId: parentUser.id,
+            type: NotificationType.PAYMENT_DUE,
+            title: `Nhắc nhở: Hạn đóng học phí T9 - ${studentName}`,
+            message: `Quý phụ huynh vui lòng hoàn thành đóng học phí tháng 9 cho bé ${studentName} trước ngày 30/09/2023.`,
+            priority: NotificationPriority.HIGH,
+            status: NotificationStatus.UNREAD,
+            data: {
+              sourceName: 'Phòng Tài chính',
+              sourceIcon: 'card-outline',
+              badge: 'Học phí',
+              time: '10:00',
+              date: '20/09/2023',
+            },
+            createdAt: new Date(),
+          });
+        }
+      }
+
+      if (seeds.length > 0) {
+        await this.notificationModel.insertMany(seeds);
+        this.logger.log(`✅ Seeded ${seeds.length} targeted notifications for families`);
+      }
+
+      // 4. Seed Global News & Activities (For "Tin tức & Hoạt động" section)
+      const newsCount = await this.notificationModel.countDocuments({ type: NotificationType.NEWS });
+      if (newsCount === 0) {
+        this.logger.log('🌱 Seeding global news and activities...');
+        const globalSeeds = [];
+        
+        // School News (Global)
+        globalSeeds.push({
+          userId: 'all',
+          type: NotificationType.NEWS,
+          title: 'Lễ khai giảng năm học mới 2023-2024',
+          message: 'Chào mừng các em học sinh quay trở lại trường sau kỳ nghỉ hè rực rỡ. Chúc các em một năm học mới đầy hứng khởi.',
+          priority: NotificationPriority.LOW,
+          status: NotificationStatus.UNREAD,
+          data: {
+            imageUrl: 'https://images.unsplash.com/photo-1524069290683-0457abfe42c3?auto=format&fit=crop&q=80&w=800',
+            badge: 'HOẠT ĐỘNG TRƯỜNG',
+            time: '07:30',
+            date: '05/09/2023',
+          },
+          createdAt: new Date(),
+        });
+
+        globalSeeds.push({
+          userId: 'all',
+          type: NotificationType.NEWS,
+          title: 'Ngày hội STEM - Khơi nguồn sáng tạo',
+          message: 'Các em học sinh tham gia các gian hàng khoa học, tự tay chế tạo các mô hình robotics và thí nghiệm hóa học vui.',
+          priority: NotificationPriority.LOW,
+          status: NotificationStatus.UNREAD,
+          data: {
+            imageUrl: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
+            badge: 'HOẠT ĐỘNG TRƯỜNG',
+            time: '09:00',
+            date: '10/10/2023',
+          },
+          createdAt: new Date(),
+        });
+
+        // Class Activities (Limit to first 3 classes to keep seeding fast)
+        const classes = await this.classRepository.find({ take: 3 });
+        for (const cls of classes) {
+          globalSeeds.push({
+            userId: 'all',
+            type: NotificationType.ACTIVITY,
+            title: `Hoạt động trải nghiệm: "Sắc màu văn hóa" - Lớp ${cls.name}`,
+            message: `Các bạn học sinh lớp ${cls.name} đã có một buổi trải nghiệm thú vị về các nét văn hóa đặc trưng của các vùng miền.`,
+            priority: NotificationPriority.LOW,
+            status: NotificationStatus.UNREAD,
+            data: {
+              classId: cls.id,
+              imageUrl: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&q=80&w=800',
+              badge: 'HOẠT ĐỘNG LỚP',
+              time: '14:00',
+              date: '10/09/2023',
+            },
+            createdAt: new Date(),
+          });
+        }
+
+        await this.notificationModel.insertMany(globalSeeds);
+        this.logger.log(`✅ Seeded ${globalSeeds.length} global news and activities`);
+      }
+      } catch (error) {
+      this.logger.error('Error seeding notifications:', error);
+    }
+  }
 
   async create(dto: CreateNotificationDto): Promise<Notification> {
     const notification = await this.notificationModel.create({
@@ -83,11 +242,21 @@ export class NotificationsService {
       type?: NotificationType;
       limit?: number;
       skip?: number;
+      classId?: string;
     } = {},
   ): Promise<{ data: Notification[]; total: number }> {
-    const query: any = { userId };
+    // Current user can see their own notifications AND global ones ('all')
+    const query: any = {
+      $or: [{ userId }, { userId: 'all' }],
+    };
+
     if (options.status) query.status = options.status;
     if (options.type) query.type = options.type;
+
+    // If it's a class-specific activity request
+    if (options.classId) {
+      query['data.classId'] = options.classId;
+    }
 
     const [data, total] = await Promise.all([
       this.notificationModel
@@ -104,6 +273,73 @@ export class NotificationsService {
 
   async findById(id: string): Promise<Notification> {
     return this.notificationModel.findById(id);
+  }
+
+  async toggleLike(id: string, userId: string): Promise<Notification> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new Error('Invalid notification ID');
+    }
+    const notification = await this.notificationModel.findById(id);
+    if (!notification) return null;
+
+    const likes = notification.likes || [];
+    const index = likes.indexOf(userId);
+
+    if (index > -1) {
+      likes.splice(index, 1); // Unlike
+    } else {
+      likes.push(userId); // Like
+    }
+
+    return this.notificationModel.findByIdAndUpdate(
+      id,
+      { likes },
+      { new: true },
+    );
+  }
+
+  async addComment(
+    id: string,
+    userId: string,
+    content: string,
+    providedUserName?: string,
+    providedUserAvatar?: string,
+    providedUserRole?: string
+  ) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new Error('Invalid notification ID');
+    }
+
+    let userName = providedUserName || 'Người dùng';
+    let userAvatar = providedUserAvatar || '';
+    let userRole = providedUserRole || 'PARENT';
+
+    if (!providedUserName || !providedUserAvatar || !providedUserRole) {
+      const user = await this.userRepository.findOneBy({ id: userId as any });
+      if (user) {
+        userName = providedUserName || user.fullName || 'Người dùng';
+        userAvatar = providedUserAvatar || user.avatarUrl || '';
+        userRole = providedUserRole || user.role || 'PARENT';
+      }
+    }
+
+    const comment = {
+      userId,
+      userName,
+      userAvatar,
+      userRole,
+      content,
+      createdAt: new Date(),
+    };
+    return this.notificationModel.findByIdAndUpdate(
+      id,
+      {
+        $push: {
+          comments: comment,
+        },
+      },
+      { new: true },
+    ).exec();
   }
 
   async markAsRead(id: string, userId: string): Promise<Notification> {

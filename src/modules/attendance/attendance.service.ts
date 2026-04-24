@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
 import { Attendance, AttendanceStatus } from './entities/attendance.entity';
-import { AttendanceSummary, PeriodType } from './entities/attendance-summary.entity';
+import { AttendanceSummary } from './entities/attendance-summary.entity';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { BulkAttendanceDto } from './dto/bulk-attendance.dto';
@@ -91,63 +91,46 @@ export class AttendanceService {
     limit?: number;
   }): Promise<{ data: Attendance[]; total: number }> {
     try {
-      const { page = 1, limit = 50, startDate, endDate, ...rest } = filters;
-      const skip = (page - 1) * limit;
+      const { startDate, endDate } = filters;
+      
+      // Force values to be valid positive integers
+      const pageNum = Math.max(1, parseInt(filters.page as any) || 1);
+      const limitNum = Math.max(1, Math.min(100, parseInt(filters.limit as any) || 50));
+      
+      const skipCount = (pageNum - 1) * limitNum;
+      const takeCount = limitNum;
 
-      const query = this.attendanceRepository.createQueryBuilder('attendance');
-
-      if (filters.studentId) {
-        query.andWhere('attendance.studentId = :studentId', {
-          studentId: filters.studentId,
-        });
-      }
-
-      if (filters.classId) {
-        query.andWhere('attendance.classId = :classId', {
-          classId: filters.classId,
-        });
-      }
-
-      if (filters.schoolId) {
-        query.andWhere('attendance.schoolId = :schoolId', {
-          schoolId: filters.schoolId,
-        });
-      }
-
-      if (filters.subjectId) {
-        query.andWhere('attendance.subjectId = :subjectId', {
-          subjectId: filters.subjectId,
-        });
-      }
-
-      if (filters.status) {
-        query.andWhere('attendance.status = :status', { status: filters.status });
-      }
+      const where: any = {};
+      if (filters.studentId) where.studentId = filters.studentId;
+      if (filters.classId) where.classId = filters.classId;
+      if (filters.schoolId) where.schoolId = filters.schoolId;
+      if (filters.subjectId) where.subjectId = filters.subjectId;
+      if (filters.status) where.status = filters.status;
 
       if (startDate && endDate) {
-        query.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
-          startDate,
-          endDate,
-        });
+        where.date = Between(startDate, endDate);
       } else if (startDate) {
-        query.andWhere('attendance.date >= :startDate', { startDate });
+        where.date = MoreThanOrEqual(startDate);
       } else if (endDate) {
-        query.andWhere('attendance.date <= :endDate', { endDate });
+        where.date = LessThanOrEqual(endDate);
       }
 
-      query
-        .leftJoinAndSelect('attendance.student', 'student')
-        .leftJoinAndSelect('attendance.class', 'class')
-        .leftJoinAndSelect('attendance.subject', 'subject')
-        .orderBy('attendance.date', 'DESC')
-        .skip(skip)
-        .take(limit);
+      console.log(`[AttendanceService] findAll - where: ${JSON.stringify(where)}`);
+      
+      // Removed 'subject' relation to improve stability as it's not needed in current mobile views
+      const [data, total] = await this.attendanceRepository.findAndCount({
+        where,
+        relations: ['student', 'class'],
+        order: { date: 'DESC' },
+        skip: skipCount,
+        take: takeCount,
+      });
 
-      const [data, total] = await query.getManyAndCount();
+      console.log(`[AttendanceService] findAll - Found ${data.length} records, total: ${total}`);
 
       return { data, total };
     } catch (error) {
-      console.error(`[AttendanceService] Error in findAll: ${error.message}`);
+      console.error(`[AttendanceService] Error in findAll query: ${error.message}`, error.stack);
       return { data: [], total: 0 };
     }
   }
@@ -201,18 +184,17 @@ export class AttendanceService {
     attendanceRate: number;
   }> {
     try {
-      const query = this.attendanceRepository
-        .createQueryBuilder('attendance')
-        .where('attendance.studentId = :studentId', { studentId });
+      const where: any = { studentId };
 
       if (startDate && endDate) {
-        query.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
-          startDate,
-          endDate,
-        });
+        where.date = Between(startDate, endDate);
+      } else if (startDate) {
+        where.date = MoreThanOrEqual(startDate);
+      } else if (endDate) {
+        where.date = LessThanOrEqual(endDate);
       }
 
-      const records = await query.getMany();
+      const records = await this.attendanceRepository.find({ where });
 
       const totalDays = records.length;
       const presentDays = records.filter((r) => r.status === AttendanceStatus.PRESENT).length;

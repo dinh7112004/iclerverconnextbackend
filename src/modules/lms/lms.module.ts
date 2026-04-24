@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../users/entities/user.entity';
+import { Student } from '../students/entities/student.entity';
+import { Subject } from '../subjects/entities/subject.entity';
+import { Teacher } from '../teachers/entities/teacher.entity';
 import { LMSController } from './lms.controller';
 import { LMSService } from './lms.service';
 import {
@@ -27,7 +30,7 @@ import {
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Student, Subject, Teacher]),
     MongooseModule.forFeature([
       { name: Course.name, schema: CourseSchema },
       { name: Lesson.name, schema: LessonSchema },

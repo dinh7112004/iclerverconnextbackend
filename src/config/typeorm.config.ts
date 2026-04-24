@@ -16,11 +16,12 @@ export const typeOrmConfig = (
   entities: [],
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
   synchronize: configService.get('NODE_ENV') === 'development',
-  logging: configService.get('NODE_ENV') === 'development',
+  logging: false, // Tắt log SQL để terminal gọn hơn theo yêu cầu
   ssl: configService.get('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
   extra: {
-    max: 20,
-    connectionTimeoutMillis: 5000,
+    max: 50,
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000,
   },
 });
 
