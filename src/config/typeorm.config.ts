@@ -14,9 +14,10 @@ export const typeOrmConfig = (
     return url;
   })(),
   entities: [__dirname + '/../modules/**/*.entity{.ts,.js}'],
+  autoLoadEntities: true,
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
   synchronize: false,
-  logging: false, // Tắt log SQL để terminal gọn hơn theo yêu cầu
+  logging: false,
   ssl: configService.get('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
   extra: {
     max: 50,
