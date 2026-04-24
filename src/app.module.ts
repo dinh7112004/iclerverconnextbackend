@@ -37,6 +37,7 @@ import { LeaveRequestsModule } from './modules/leave-requests/leave-requests.mod
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { LibraryModule } from './modules/library/library.module';
 import { SurveysModule } from './modules/surveys/surveys.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -172,6 +173,7 @@ import { SurveysModule } from './modules/surveys/surveys.module';
     UploadsModule,
     LibraryModule,
     SurveysModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
