@@ -33,7 +33,7 @@ export class UploadsController {
         },
       }),
       fileFilter: (req, file, cb) => {
-        if (!file.originalname.match(/\.(jpg|jpeg|png|pdf)$/)) {
+        if (!file.originalname.match(/\.(jpg|jpeg|png|pdf)$/i)) {
           return cb(new BadRequestException('Only image and pdf files are allowed!'), false);
         }
         cb(null, true);

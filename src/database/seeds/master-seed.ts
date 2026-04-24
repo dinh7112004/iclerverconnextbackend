@@ -8,6 +8,7 @@ async function runAllSeeds() {
     'seed-attendance-all.ts',
     'seed-lms.ts',
     'seed-extended.ts',
+    'seed-timetable.ts',
     'seed-health.ts'
   ];
 
