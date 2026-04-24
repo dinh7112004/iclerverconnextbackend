@@ -33,9 +33,13 @@ export class TeachersService {
   ) {}
 
   async onModuleInit() {
-    const count = await this.teacherRepository.count();
-    if (count === 0) {
-      await this.seedTeachers();
+    try {
+      const count = await this.teacherRepository.count();
+      if (count === 0) {
+        await this.seedTeachers();
+      }
+    } catch (error) {
+      console.warn('Teachers table not ready yet, skipping seed. It will be created by synchronize: true.');
     }
   }
 

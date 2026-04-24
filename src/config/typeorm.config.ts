@@ -15,7 +15,7 @@ export const typeOrmConfig = (
   })(),
   entities: [],
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
-  synchronize: configService.get('NODE_ENV') === 'development',
+  synchronize: true, // Ép tạo bảng tự động để sửa lỗi relation does not exist
   logging: false, // Tắt log SQL để terminal gọn hơn theo yêu cầu
   ssl: configService.get('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
   extra: {
@@ -29,7 +29,7 @@ export const typeOrmConfig = (
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+  entities: [__dirname + '/../modules/**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
 };
 

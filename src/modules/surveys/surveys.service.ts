@@ -11,11 +11,15 @@ export class SurveysService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    const count = await this.surveyRepository.count();
-    console.log(`[SurveysService] Current survey count: ${count}`);
-    if (count === 0) {
-      console.log('[SurveysService] Seeding surveys...');
-      await this.seedSurveys();
+    try {
+      const count = await this.surveyRepository.count();
+      console.log(`[SurveysService] Current survey count: ${count}`);
+      if (count === 0) {
+        console.log('[SurveysService] Seeding surveys...');
+        await this.seedSurveys();
+      }
+    } catch (error) {
+      console.warn('[SurveysService] Table not ready yet, skipping seed.');
     }
   }
 

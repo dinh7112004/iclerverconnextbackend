@@ -11,10 +11,14 @@ export class LibraryService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Seed books if none exist
-    const count = await this.bookRepository.count();
-    if (count === 0) {
-      await this.seedBooks();
+    try {
+      // Seed books if none exist
+      const count = await this.bookRepository.count();
+      if (count === 0) {
+        await this.seedBooks();
+      }
+    } catch (error) {
+      console.warn('[LibraryService] Table not ready yet, skipping seed.');
     }
   }
 

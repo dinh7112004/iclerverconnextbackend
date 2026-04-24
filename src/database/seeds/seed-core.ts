@@ -15,8 +15,25 @@ import { Class } from '../../modules/classes/entities/class.entity';
 import { TimeSlot } from '../../modules/schedules/entities/time-slot.entity';
 import { AppDataSource } from '../data-source';
 
+const firstNames = {
+  male: ['Minh', 'Tuấn', 'Hùng', 'Dũng', 'Thành', 'Phúc', 'Đức', 'Khôi', 'Hoàng', 'Nam', 'Anh', 'Quân', 'Long', 'Hải', 'Việt'],
+  female: ['Hương', 'Lan', 'Mai', 'Hoa', 'Thu', 'Linh', 'Trang', 'Hà', 'Nga', 'Nhung', 'Thảo', 'Uyển', 'Phương', 'Yến', 'Ly'],
+};
+const middleNames = ['Văn', 'Thị', 'Đình', 'Hoàng', 'Minh', 'Công', 'Thanh', 'Hữu'];
+const lastNames = ['Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Huỳnh', 'Phan', 'Vũ', 'Võ', 'Đặng'];
+
+function randomElement<T>(array: T[]): T { return array[Math.floor(Math.random() * array.length)]; }
+
+function generateVietnameseName(gender: 'male' | 'female', index?: number): any {
+  const lastName = lastNames[(index || 0) % lastNames.length];
+  const middleName = middleNames[(index || 0) % middleNames.length];
+  const pool = firstNames[gender];
+  const firstName = pool[(index || 0) % pool.length];
+  return { firstName: `${middleName} ${firstName}`, lastName, fullName: `${lastName} ${middleName} ${firstName}` };
+}
+
 async function seedCore() {
-  console.log('🌱 Seeding Core Data with CORRECT credentials (phuhuynh1, phuhuynh2...)...');
+  console.log('🌱 Seeding Core Data...');
   await AppDataSource.initialize();
 
   const userRepo = AppDataSource.getRepository(User);
@@ -31,90 +48,68 @@ async function seedCore() {
   const classRepo = AppDataSource.getRepository(Class);
   const timeSlotRepo = AppDataSource.getRepository(TimeSlot);
 
-  // TRUNCATE ALL TABLES FOR A FRESH START
-  console.log('🗑️  Truncating core tables...');
+  // Clear core tables
   await AppDataSource.query(`TRUNCATE TABLE users, schools, grades, academic_years, subjects, teachers, students, parents, student_parent_relations, classes, time_slots CASCADE;`);
-
-  const passwordHash = await bcrypt.hash('password123', 12);
 
   // 1. School
   const school = await schoolRepo.save({ name: 'Trường THCS Nguyễn Du', code: 'THCS-ND', schoolType: 'middle', status: 'active' });
-  
+
   // 2. Academic Year
   const academicYear = await academicYearRepo.save({ schoolId: school.id, name: '2024-2025', startDate: new Date('2024-09-05'), endDate: new Date('2025-05-31'), isCurrent: true });
 
   // 3. Grades & Subjects
   const gradeLevels = [6, 7, 8, 9];
-  const subjectsData = ['Toán học', 'Ngữ văn', 'Tiếng Anh', 'Vật lý', 'Hóa học', 'Sinh học'];
-  const gradeMap = new Map<number, any>();
+  const subjectTemplates = [
+    { name: 'Toán học', code: 'TOAN' }, { name: 'Ngữ văn', code: 'VAN' }, { name: 'Tiếng Anh', code: 'ANH' },
+    { name: 'Vật lý', code: 'LY' }, { name: 'Hóa học', code: 'HOA' }, { name: 'Sinh học', code: 'SINH' }
+  ];
 
   for (const level of gradeLevels) {
     const grade = await gradeRepo.save({ schoolId: school.id, name: `Khối ${level}`, gradeLevel: level });
-    gradeMap.set(level, grade);
-    for (const subName of subjectsData) {
-      await subjectRepo.save({ schoolId: school.id, name: subName, code: `${subName.toUpperCase()}-${level}`, gradeLevel: level });
+    for (const sub of subjectTemplates) {
+      await subjectRepo.save({ schoolId: school.id, ...sub, code: `${sub.code}-${level}`, gradeLevel: level });
     }
   }
 
-  // 4. Teachers
-  const teacherNames = ['Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C', 'Phạm Thị D', 'Hoàng Văn E'];
-  for (let i = 1; i <= 5; i++) {
-    const name = teacherNames[i-1];
-    const user = await userRepo.save({ email: `giaovien${i}`, phone: `090${i}000000`, passwordHash, fullName: name, role: UserRole.TEACHER, status: UserStatus.ACTIVE });
-    await teacherRepo.save({ 
-      teacherCode: `GV${i}`, userId: user.id, schoolId: school.id, 
-      firstName: name.split(' ').slice(-1)[0], lastName: name.split(' ')[0], fullName: name,
-      gender: i % 2 === 0 ? 'Nữ' : 'Nam', dateOfBirth: new Date('1985-01-01'), specialization: 'Toán học', status: UserStatus.ACTIVE 
-    });
-  }
-  const teachers = await teacherRepo.find();
+  // 4. Admin Users
+  const passwordHash = await bcrypt.hash('password123', 12);
+  await userRepo.save({ email: 'admin@thcsnguyendu.edu.vn', phone: '0901234567', passwordHash, fullName: 'Nguyễn Văn Admin', role: UserRole.SUPER_ADMIN, status: UserStatus.ACTIVE });
 
-  // 5. Classes & Students (4 grades * 2 classes * 5 students = 40 students)
-  let studentCount = 1;
-  for (const level of gradeLevels) {
-    const grade = gradeMap.get(level);
+  // 5. Teachers
+  for (let i = 1; i <= 10; i++) {
+    const { fullName } = generateVietnameseName(i % 2 === 0 ? 'female' : 'male', i);
+    const user = await userRepo.save({ email: `giaovien${i}@thcsnguyendu.edu.vn`, phone: `090${i}000000`, passwordHash, fullName, role: UserRole.TEACHER, status: UserStatus.ACTIVE });
+    await teacherRepo.save({ teacherCode: `GV${i}`, userId: user.id, schoolId: school.id, fullName, specialization: 'Toán học', status: UserStatus.ACTIVE });
+  }
+
+  // 6. Classes & Students
+  const grades = await gradeRepo.find();
+  const teachers = await teacherRepo.find();
+  let studentIdx = 1;
+
+  for (const grade of grades) {
     for (const letter of ['A', 'B']) {
-      const className = `${level}${letter}`;
-      const cls = await classRepo.save({ 
-        schoolId: school.id, gradeId: grade.id, academicYearId: academicYear.id, 
-        name: className, code: `CLASS-${className}`, homeroomTeacherId: teachers[0].id 
-      });
-      
+      const className = `${grade.gradeLevel}${letter}`;
+      const cls = await classRepo.save({ schoolId: school.id, gradeId: grade.id, academicYearId: academicYear.id, name: className, homeroomTeacherId: teachers[0].id });
+
       for (let i = 1; i <= 5; i++) {
-        const sName = `Học sinh ${studentCount}`;
-        const sUser = await userRepo.save({ email: `hocsinh${studentCount}`, phone: `080${studentCount}000000`, passwordHash, fullName: sName, role: UserRole.STUDENT, status: UserStatus.ACTIVE });
-        const student = await studentRepo.save({ 
-          studentCode: `HS${studentCount}`, userId: sUser.id, schoolId: school.id, 
-          firstName: `Học sinh`, lastName: `${studentCount}`, fullName: sName,
-          gender: i % 2 === 0 ? 'Nữ' : 'Nam', dateOfBirth: new Date('2012-01-01'), currentClassId: cls.id, status: UserStatus.ACTIVE 
-        });
+        const { fullName } = generateVietnameseName(i % 2 === 0 ? 'female' : 'male', studentIdx);
+        const sUser = await userRepo.save({ email: `hocsinh${studentIdx}@thcsnguyendu.edu.vn`, phone: `080${studentIdx}000000`, passwordHash, fullName, role: UserRole.STUDENT, status: UserStatus.ACTIVE });
+        const student = await studentRepo.save({ studentCode: `HS${studentIdx}`, userId: sUser.id, schoolId: school.id, fullName, currentClassId: cls.id, status: UserStatus.ACTIVE });
 
         // Parent
-        const pName = `Phụ huynh ${studentCount}`;
-        const pUser = await userRepo.save({ email: `phuhuynh${studentCount}`, phone: `070${studentCount}000000`, passwordHash, fullName: pName, role: UserRole.PARENT, status: UserStatus.ACTIVE });
-        const parent = await parentRepo.save({ 
-          userId: pUser.id, firstName: `Phụ huynh`, lastName: `${studentCount}`, fullName: pName, relationship: 'Cha' 
-        });
+        const pEmail = `phuhuynh${studentIdx}@thcsnguyendu.edu.vn`;
+        const pUser = await userRepo.save({ email: pEmail, phone: `070${studentIdx}000000`, passwordHash, fullName: `Phụ huynh ${fullName}`, role: UserRole.PARENT, status: UserStatus.ACTIVE });
+        const parent = await parentRepo.save({ userId: pUser.id, fullName: `Phụ huynh ${fullName}`, relationship: 'Cha' });
         await relationRepo.save({ studentId: student.id, parentId: parent.id, relationship: 'Cha', isPrimary: true });
-        
-        studentCount++;
+
+        studentIdx++;
       }
     }
   }
 
-  // 6. Time Slots
-  const slots = [
-    { period: 1, name: 'Tiết 1', startTime: '07:00', endTime: '07:45' },
-    { period: 2, name: 'Tiết 2', startTime: '07:50', endTime: '08:35' },
-    { period: 3, name: 'Tiết 3', startTime: '08:40', endTime: '09:25' },
-    { period: 4, name: 'Tiết 4', startTime: '09:45', endTime: '10:30' },
-  ];
-  for (const s of slots) {
-    await timeSlotRepo.save({ schoolId: school.id, ...s, duration: 45, isActive: true });
-  }
-
-  console.log('✅ Core seeding completed with credentials like phuhuynh1, hocsinh1...');
+  console.log('✅ Core seeding completed.');
   await AppDataSource.destroy();
 }
 
-seedCore().catch(console.error);
+seedCore().catch(e => console.error(e));
