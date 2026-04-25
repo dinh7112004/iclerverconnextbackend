@@ -8,6 +8,10 @@ import { AttendanceService } from '../attendance/attendance.service';
 import { AcademicRecordsService } from '../academic-records/academic-records.service';
 import { LeaveRequestsService } from '../leave-requests/leave-requests.service';
 import { NutritionService } from '../nutrition/nutrition.service';
+import { PaymentsService } from '../payments/payments.service';
+import { HealthService } from '../health/health.service';
+import { TransportationService } from '../transportation/transportation.service';
+import { SchoolsService } from '../schools/schools.service';
 import { Student } from '../students/entities/student.entity';
 import { Semester } from '../academic-records/entities/grade.entity';
 
@@ -25,6 +29,10 @@ export class AiService {
     private readonly academicService: AcademicRecordsService,
     private readonly leaveService: LeaveRequestsService,
     private readonly nutritionService: NutritionService,
+    private readonly paymentsService: PaymentsService,
+    private readonly healthService: HealthService,
+    private readonly transportationService: TransportationService,
+    private readonly schoolsService: SchoolsService,
   ) { }
 
   /** Calls Gemini with streaming response. */
@@ -39,9 +47,14 @@ export class AiService {
       this.logger.error('Gemini API key missing');
       throw new Error('Gemini API key not configured');
     }
-    let systemContext = "Bạn là trợ lý AI thông minh của ứng dụng trường học iClever. Hãy trả lời thân thiện, ngắn gọn và hữu ích. " +
-      "QUAN TRỌNG: Tuyệt đối KHÔNG sử dụng mã LaTeX (ví dụ: \\frac, \\cdot, $). Hãy viết công thức toán học bằng ký tự văn bản bình thường (ví dụ: dùng 1/2 thay vì phân số phức tạp, dùng dấu x hoặc * thay vì \\cdot). " +
-      "Hãy trình bày rõ ràng, dễ đọc cho học sinh lớp 6. ";
+    let systemContext = `Bạn là trợ lý AI chuyên gia của hệ thống giáo dục iClever, là một người bạn đồng hành thông minh, thấu hiểu và cực kỳ tận tâm. Nhiệm vụ của bạn là hỗ trợ học sinh và phụ huynh tra cứu thông tin học tập, lịch trình, sức khỏe, và giải đáp mọi thắc mắc về trường học. Hãy trả lời với phong cách hiện đại, sử dụng ngôn ngữ tự nhiên, đôi khi có thể dùng thêm emoji phù hợp 🚀✨. 
+QUAN TRỌNG: Tuyệt đối KHÔNG sử dụng mã LaTeX (ví dụ: \\frac, \\cdot, $). Hãy viết công thức toán học bằng ký tự văn bản bình thường (ví dụ: dùng 1/2 thay vì phân số phức tạp, dùng dấu x hoặc * thay vì \\cdot). 
+Hãy trình bày rõ ràng, dễ đọc cho học sinh lớp 6,7,8,9.
+- PHONG CÁCH: Trò chuyện như một người anh/chị khóa trên cực kỳ thông thái, luôn sẵn sàng giúp đỡ. Hãy sử dụng những câu khích lệ như 'Cố gắng lên nhé!', 'Chúc bạn một ngày học tập thật hiệu quả!',...
+- TỰ ĐỘNG PHÂN TÍCH: Nếu thấy điểm số thấp, hãy nhắc nhở ôn tập nhẹ nhàng. Nếu thấy có đơn nghỉ phép, hãy hỏi thăm sức khỏe. Nếu thấy sắp đến giờ học, hãy nhắc nhở chuẩn bị sách vở.
+- KIẾN THỨC: Bạn biết rõ mọi thông tin về iClever - nền tảng kết nối nhà trường và gia đình hàng đầu. Bạn có thể giúp tra cứu điểm, xem menu canteen, theo dõi xe bus, và cả trò chuyện giải trí sau giờ học.
+`;
+
 
     if (userId) {
       try {
@@ -82,6 +95,14 @@ export class AiService {
                 systemContext += `\n- THỜI KHÓA BIỂU CẢ TUẦN:${timetableSummary}`;
               }
             } catch (e) { }
+          // 9. SCHOOL INFO
+          try {
+            const school = await this.schoolsService.findOneSchool(student.schoolId);
+            if (school) {
+              systemContext += `
+- TRƯỜNG: ${school.name} (Địa chỉ: ${school.address || 'Chưa cập nhật'})`;
+            }
+          } catch (e) { }
           }
 
           // 2. ATTENDANCE
@@ -118,6 +139,44 @@ export class AiService {
               systemContext += `\n- THỰC ĐƠN HÔM NAY: ${dishes}`;
             }
           } catch (e) { }
+          // 6. PAYMENTS (INVOICES)
+          try {
+            const invoicesResult = await this.paymentsService.findInvoices({ studentId: student.id, status: 'pending' as any });
+
+            const unpaidInvoices = invoicesResult.data || [];
+            if (unpaidInvoices.length > 0) {
+              const totalUnpaid = unpaidInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+              systemContext += `
+- HỌC PHÍ: Bạn còn ${unpaidInvoices.length} hóa đơn chưa thanh toán. Tổng số tiền: ${totalUnpaid.toLocaleString('vi-VN')} VNĐ.`;
+            }
+          } catch (e) { }
+
+          // 7. HEALTH INFO
+          const health = (student as any).healthInfo;
+          if (health) {
+            systemContext += `
+- SỨC KHỎE: Chiều cao ${health.height || '---'}cm, Cân nặng ${health.weight || '---'}kg. Ghi chú: ${health.importantNote || 'Bình thường'}`;
+          }
+
+          // 8. TRANSPORTATION (BUS)
+          try {
+            const busInfo = await this.transportationService.getStudentBusInfo(student.id);
+            if (busInfo && busInfo.driver) {
+              const nextStatus = busInfo.schedule && busInfo.schedule.length > 0 ? busInfo.schedule[0].status : 'Đang chờ';
+              systemContext += `
+- XE ĐƯA ĐÓN: Xe biển số ${busInfo.driver.plate}, Tài xế: ${busInfo.driver.name} (${busInfo.driver.phone}). Trạng thái: ${nextStatus}`;
+            }
+          } catch (e) { }
+
+
+          // 9. SCHOOL INFO
+          try {
+            const school = await this.schoolsService.findOneSchool(student.schoolId);
+            if (school) {
+              systemContext += `
+- TRƯỜNG: ${school.name} (Địa chỉ: ${school.address || 'Chưa cập nhật'})`;
+            }
+          } catch (e) { }
         }
       } catch (e) {
         this.logger.warn('Could not load full student context for AI');
@@ -125,6 +184,7 @@ export class AiService {
     }
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${this.geminiApiKey}&alt=sse`;
+
 
 
     const parts: any[] = [{ text: prompt }];

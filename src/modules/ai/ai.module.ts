@@ -9,6 +9,10 @@ import { AttendanceModule } from '../attendance/attendance.module';
 import { AcademicRecordsModule } from '../academic-records/academic-records.module';
 import { LeaveRequestsModule } from '../leave-requests/leave-requests.module';
 import { NutritionModule } from '../nutrition/nutrition.module';
+import { SchoolsModule } from '../schools/schools.module';
+import { PaymentsModule } from '../payments/payments.module';
+import { HealthModule } from '../health/health.module';
+import { TransportationModule } from '../transportation/transportation.module';
 
 @Module({
   imports: [
@@ -19,6 +23,10 @@ import { NutritionModule } from '../nutrition/nutrition.module';
     AcademicRecordsModule,
     LeaveRequestsModule,
     NutritionModule,
+    PaymentsModule,
+    HealthModule,
+    TransportationModule,
+    SchoolsModule,
   ],
   controllers: [AiController],
   providers: [AiService],
