@@ -77,9 +77,9 @@ async function seedCore() {
 
   // 5. Teachers
   for (let i = 1; i <= 10; i++) {
-    const { fullName } = generateVietnameseName(i % 2 === 0 ? 'female' : 'male', i);
+    const { firstName, lastName, fullName } = generateVietnameseName(i % 2 === 0 ? 'female' : 'male', i);
     const user = await userRepo.save({ email: `giaovien${i}@thcsnguyendu.edu.vn`, phone: `090${i}000000`, passwordHash, fullName, role: UserRole.TEACHER, status: UserStatus.ACTIVE });
-    await teacherRepo.save({ teacherCode: `GV${i}`, userId: user.id, schoolId: school.id, fullName, specialization: 'Toán học', status: UserStatus.ACTIVE });
+    await teacherRepo.save({ teacherCode: `GV${i}`, userId: user.id, schoolId: school.id, firstName, lastName, fullName, dateOfBirth: new Date(1980 + i, 0, 1), specialization: 'Toán học', status: UserStatus.ACTIVE });
   }
 
   // 6. Classes & Students
@@ -90,17 +90,17 @@ async function seedCore() {
   for (const grade of grades) {
     for (const letter of ['A', 'B']) {
       const className = `${grade.gradeLevel}${letter}`;
-      const cls = await classRepo.save({ schoolId: school.id, gradeId: grade.id, academicYearId: academicYear.id, name: className, homeroomTeacherId: teachers[0].id });
+      const cls = await classRepo.save({ schoolId: school.id, gradeId: grade.id, academicYearId: academicYear.id, name: className, code: className, homeroomTeacherId: teachers[0].id });
 
       for (let i = 1; i <= 5; i++) {
-        const { fullName } = generateVietnameseName(i % 2 === 0 ? 'female' : 'male', studentIdx);
+        const { firstName, lastName, fullName } = generateVietnameseName(i % 2 === 0 ? 'female' : 'male', studentIdx);
         const sUser = await userRepo.save({ email: `hocsinh${studentIdx}@thcsnguyendu.edu.vn`, phone: `080${studentIdx}000000`, passwordHash, fullName, role: UserRole.STUDENT, status: UserStatus.ACTIVE });
-        const student = await studentRepo.save({ studentCode: `HS${studentIdx}`, userId: sUser.id, schoolId: school.id, fullName, currentClassId: cls.id, status: UserStatus.ACTIVE });
+        const student = await studentRepo.save({ studentCode: `HS${studentIdx}`, userId: sUser.id, schoolId: school.id, firstName, lastName, fullName, dateOfBirth: new Date(2010 + grade.gradeLevel - 6, 0, 1), currentClassId: cls.id, status: UserStatus.ACTIVE });
 
         // Parent
         const pEmail = `phuhuynh${studentIdx}@thcsnguyendu.edu.vn`;
         const pUser = await userRepo.save({ email: pEmail, phone: `070${studentIdx}000000`, passwordHash, fullName: `Phụ huynh ${fullName}`, role: UserRole.PARENT, status: UserStatus.ACTIVE });
-        const parent = await parentRepo.save({ userId: pUser.id, fullName: `Phụ huynh ${fullName}`, relationship: 'Cha' });
+        const parent = await parentRepo.save({ userId: pUser.id, firstName, lastName, fullName: `Phụ huynh ${fullName}`, relationship: 'Cha' });
         await relationRepo.save({ studentId: student.id, parentId: parent.id, relationship: 'Cha', isPrimary: true });
 
         studentIdx++;

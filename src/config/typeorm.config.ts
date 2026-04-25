@@ -13,8 +13,6 @@ export const typeOrmConfig = (
     }
     return url;
   })(),
-  entities: [__dirname + '/../modules/**/*.entity{.ts,.js}'],
-  autoLoadEntities: true,
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
   synchronize: false,
   logging: false,

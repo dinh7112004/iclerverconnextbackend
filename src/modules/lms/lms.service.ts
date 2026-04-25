@@ -338,13 +338,39 @@ export class LMSService {
     completedContents?: string[];
     lastPosition?: number;
   }): Promise<StudentProgress> {
-    const progress = await this.progressModel.findOne({
+    let progress = await this.progressModel.findOne({
       studentId: data.studentId,
       courseId: data.courseId,
     });
 
     if (!progress) {
-      throw new NotFoundException('Không tìm thấy đăng ký khóa học');
+      this.logger.log(`Auto-enrolling student ${data.studentId} in course ${data.courseId} for progress tracking`);
+      const student = await this.studentRepository.findOne({ where: { id: data.studentId } });
+      const course = await this.courseModel.findById(data.courseId);
+      
+      if (!course || !student) {
+        throw new NotFoundException('Không tìm thấy thông tin khóa học hoặc học sinh');
+      }
+
+      progress = await this.progressModel.create({
+        studentId: data.studentId,
+        studentName: student.fullName,
+        courseId: data.courseId,
+        courseName: course.name,
+        enrolledAt: new Date(),
+        status: ProgressStatus.IN_PROGRESS,
+        progressPercentage: 0,
+        overallScore: 0,
+        totalTimeSpent: 0,
+        lessonProgress: []
+      });
+
+      // Update course enrollment count
+      course.enrollmentCount += 1;
+      if (!course.studentIds.includes(data.studentId)) {
+        course.studentIds.push(data.studentId);
+      }
+      await course.save();
     }
 
     const lessonIdx = progress.lessonProgress.findIndex((lp) => lp.lessonId === data.lessonId);

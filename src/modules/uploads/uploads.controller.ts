@@ -5,6 +5,7 @@ import {
   UploadedFile,
   BadRequestException,
   Query,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -43,13 +44,16 @@ export class UploadsController {
       },
     }),
   )
-  async uploadFile(@UploadedFile() file: Express.Multer.File, @Query('folder') folder: string = 'others') {
+  async uploadFile(@UploadedFile() file: Express.Multer.File, @Query('folder') folder: string = 'others', @Req() request: any) {
     if (!file) {
       throw new BadRequestException('File is required');
     }
     
-    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
-    // Return the URL based on the folder structure
+    // Tự động lấy Host của server (ví dụ Render) nếu không có biến môi trường
+    const protocol = request.protocol;
+    const host = request.get('host');
+    const baseUrl = process.env.API_BASE_URL || `${protocol}://${host}`;
+
     return {
       success: true,
       url: `${baseUrl}/${folder}/${file.filename}`,
