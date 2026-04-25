@@ -8,31 +8,36 @@ import {
   Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import { extname } from 'path';
 import { v4 as uuid } from 'uuid';
-import * as fs from 'fs';
+import * as admin from 'firebase-admin';
+import * as path from 'path';
 
 @Controller('uploads')
 export class UploadsController {
+  private bucket: any;
+
+  constructor() {
+    // Initialize Firebase Admin if not already initialized
+    if (admin.apps.length === 0) {
+      try {
+        const serviceAccountPath = path.join(process.cwd(), 'firebase-service-account.json');
+        admin.initializeApp({
+          credential: admin.credential.cert(serviceAccountPath),
+          storageBucket: 'thithu123.firebasestorage.app', // Thay bằng bucket của bạn nếu khác
+        });
+      } catch (error) {
+        console.error('Firebase initialization error:', error);
+      }
+    }
+    this.bucket = admin.storage().bucket();
+  }
+
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: (req: any, file, cb) => {
-          const folder = req.query.folder || 'others';
-          const uploadPath = `./public/${folder}`;
-          
-          if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-          }
-          cb(null, uploadPath);
-        },
-        filename: (req, file, cb) => {
-          const randomName = uuid();
-          cb(null, `${randomName}${extname(file.originalname)}`);
-        },
-      }),
+      storage: memoryStorage(),
       fileFilter: (req, file, cb) => {
         if (!file.originalname.match(/\.(jpg|jpeg|png|gif|pdf)$/i)) {
           return cb(new BadRequestException('Only image and pdf files are allowed!'), false);
@@ -44,21 +49,41 @@ export class UploadsController {
       },
     }),
   )
-  async uploadFile(@UploadedFile() file: Express.Multer.File, @Query('folder') folder: string = 'others', @Req() request: any) {
+  async uploadFile(@UploadedFile() file: Express.Multer.File, @Query('folder') folder: string = 'others') {
     if (!file) {
       throw new BadRequestException('File is required');
     }
+
+    const fileName = `${folder}/${uuid()}${extname(file.originalname)}`;
+    const blob = this.bucket.file(fileName);
     
-    // Fix: Render dùng proxy nên protocol có thể là http, phải đọc X-Forwarded-Proto
-    const forwardedProto = request.headers['x-forwarded-proto'];
-    const protocol = forwardedProto ? forwardedProto.split(',')[0].trim() : request.protocol;
-    const host = request.get('host');
-    const rootUrl = `${protocol}://${host}`;
+    const blobStream = blob.createWriteStream({
+      metadata: {
+        contentType: file.mimetype,
+      },
+      resumable: false
+    });
 
-    return {
-      success: true,
-      url: `${rootUrl}/${folder}/${file.filename}`,
-    };
+    return new Promise((resolve, reject) => {
+      blobStream.on('error', (err) => {
+        console.error('Firebase Upload Error:', err);
+        reject(new BadRequestException('Failed to upload to Google Storage'));
+      });
 
+      blobStream.on('finish', async () => {
+        // Làm cho file có thể truy cập công khai
+        await blob.makePublic();
+        
+        // Trả về link Google Storage
+        const publicUrl = `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
+        
+        resolve({
+          success: true,
+          url: publicUrl,
+        });
+      });
+
+      blobStream.end(file.buffer);
+    });
   }
 }
