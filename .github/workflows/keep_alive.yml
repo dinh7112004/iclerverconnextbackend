@@ -1,0 +1,15 @@
+name: Keep Server Awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # Chạy mỗi 10 phút một lần
+  workflow_dispatch: # Cho phép bấm chạy thủ công nếu muốn
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake up Render Server
+        run: |
+          curl -s https://iclerverconnextbackend.onrender.com/api/v1/auth/me
+          echo "Successfully pinged server at $(date)"
