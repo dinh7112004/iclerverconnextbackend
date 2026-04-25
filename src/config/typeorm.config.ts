@@ -19,10 +19,12 @@ export const typeOrmConfig = (
   synchronize: false,
   logging: false,
   ssl: configService.get('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
+  schema: 'public',
   extra: {
     max: 50,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,
+    options: '-c search_path=public',
   },
 });
 
