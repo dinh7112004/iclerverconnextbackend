@@ -161,10 +161,15 @@ Hãy trình bày rõ ràng, dễ đọc cho học sinh lớp 6,7,8,9.
           // 8. TRANSPORTATION (BUS)
           try {
             const busInfo = await this.transportationService.getStudentBusInfo(student.id);
-            if (busInfo && busInfo.driver) {
-              const nextStatus = busInfo.schedule && busInfo.schedule.length > 0 ? busInfo.schedule[0].status : 'Đang chờ';
+            if (busInfo) {
+              const driver = (busInfo.driver || {}) as any;
+              const plate = driver.plate || 'Chưa rõ';
+              const driverName = driver.name || 'Chưa rõ';
+              const driverPhone = driver.phone || 'Chưa rõ';
+
+              const nextStatus = (busInfo.schedule && busInfo.schedule.length > 0) ? busInfo.schedule[0].status : 'Đang chờ';
               systemContext += `
-- XE ĐƯA ĐÓN: Xe biển số ${busInfo.driver.plate}, Tài xế: ${busInfo.driver.name} (${busInfo.driver.phone}). Trạng thái: ${nextStatus}`;
+- XE ĐƯA ĐÓN: Xe biển số ${plate}, Tài xế: ${driverName} (${driverPhone}). Trạng thái: ${nextStatus}`;
             }
           } catch (e) { }
 
@@ -183,7 +188,7 @@ Hãy trình bày rõ ràng, dễ đọc cho học sinh lớp 6,7,8,9.
       }
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${this.geminiApiKey}&alt=sse`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?key=${this.geminiApiKey}&alt=sse`;
 
 
 
