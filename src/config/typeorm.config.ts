@@ -24,7 +24,6 @@ export const typeOrmConfig = (
     max: 50,
     connectionTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,
-    options: '-c search_path=public',
   },
 });
 
