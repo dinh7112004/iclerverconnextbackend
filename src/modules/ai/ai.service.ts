@@ -188,7 +188,7 @@ Hãy trình bày rõ ràng, dễ đọc cho học sinh lớp 6,7,8,9.
       }
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?key=${this.geminiApiKey}&alt=sse`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:streamGenerateContent?key=${this.geminiApiKey}&alt=sse`;
 
 
 
