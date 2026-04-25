@@ -74,11 +74,12 @@ export class UploadsController {
     try {
       const fileName = `${folder}_${uuid()}${extname(file.originalname)}`;
       
-      // Upload file lên Google Drive
+      // Upload file lên Google Drive vào thư mục được chỉ định
       const response = await this.drive.files.create({
         requestBody: {
           name: fileName,
           mimeType: file.mimetype,
+          parents: ['1q4kD7cjPcdu_ZfW_7j5nVu5UPkzQjVXr'], // ID thư mục mày vừa tạo
         },
         media: {
           mimeType: file.mimetype,
