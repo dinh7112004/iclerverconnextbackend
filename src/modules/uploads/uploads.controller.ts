@@ -22,9 +22,9 @@ export class UploadsController {
     if (this.drive) return;
 
     try {
-      const clientId = process.env.GOOGLE_CLIENT_ID;
-      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-      const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+      const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+      const refreshToken = process.env.GOOGLE_REFRESH_TOKEN?.trim();
 
       if (!clientId || !clientSecret || !refreshToken) {
         throw new Error('Missing Google OAuth2 credentials in environment variables');
