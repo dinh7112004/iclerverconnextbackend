@@ -5,48 +5,43 @@ import {
   UploadedFile,
   BadRequestException,
   Query,
-  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { extname } from 'path';
 import { v4 as uuid } from 'uuid';
-import * as admin from 'firebase-admin';
+import { google } from 'googleapis';
+import { Readable } from 'stream';
 import * as path from 'path';
 
 @Controller('uploads')
 export class UploadsController {
-  private bucket: any;
+  private drive: any;
 
-  private initializeFirebase() {
-    if (admin.apps.length > 0) {
-      this.bucket = admin.storage().bucket();
-      return;
-    }
+  private async initializeDrive() {
+    if (this.drive) return;
 
     try {
-      const config = process.env.FIREBASE_CONFIG;
+      const config = process.env.FIREBASE_CONFIG; // Dùng chung biến này cho tiện
+      let auth;
+      
       if (config) {
-        // Ưu tiên đọc từ biến môi trường (Render)
         const serviceAccount = JSON.parse(config);
-        admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
-          storageBucket: 'thithu123.firebasestorage.app',
+        auth = new google.auth.GoogleAuth({
+          credentials: serviceAccount,
+          scopes: ['https://www.googleapis.com/auth/drive.file'],
         });
-        console.log('Firebase initialized from ENV');
       } else {
-        // Local thì dùng file (nếu có)
         const serviceAccountPath = path.join(process.cwd(), 'firebase-service-account.json');
-        admin.initializeApp({
-          credential: admin.credential.cert(serviceAccountPath),
-          storageBucket: 'thithu123.firebasestorage.app',
+        auth = new google.auth.GoogleAuth({
+          keyFile: serviceAccountPath,
+          scopes: ['https://www.googleapis.com/auth/drive.file'],
         });
-        console.log('Firebase initialized from FILE');
       }
-      this.bucket = admin.storage().bucket();
+      this.drive = google.drive({ version: 'v3', auth });
+      console.log('Google Drive API initialized');
     } catch (error) {
-      console.warn('Firebase init warning:', error.message);
-      // Không ném lỗi ở đây để tránh làm sập server lúc khởi động
+      console.error('Google Drive initialization error:', error.message);
     }
   }
 
@@ -70,40 +65,49 @@ export class UploadsController {
       throw new BadRequestException('File is required');
     }
 
-    // Chỉ khởi tạo khi thực sự cần upload
-    this.initializeFirebase();
+    await this.initializeDrive();
 
-    if (!this.bucket) {
-      throw new BadRequestException('Firebase Storage is not configured properly.');
+    if (!this.drive) {
+      throw new BadRequestException('Google Drive is not configured properly.');
     }
 
-    const fileName = `${folder}/${uuid()}${extname(file.originalname)}`;
-    const blob = this.bucket.file(fileName);
-    
-    const blobStream = blob.createWriteStream({
-      metadata: { contentType: file.mimetype },
-      resumable: false
-    });
-
-    return new Promise((resolve, reject) => {
-      blobStream.on('error', (err) => {
-        console.error('Firebase Upload Error:', err);
-        reject(new BadRequestException('Failed to upload to Google Storage'));
+    try {
+      const fileName = `${folder}_${uuid()}${extname(file.originalname)}`;
+      
+      // Upload file lên Google Drive
+      const response = await this.drive.files.create({
+        requestBody: {
+          name: fileName,
+          mimeType: file.mimetype,
+        },
+        media: {
+          mimeType: file.mimetype,
+          body: Readable.from(file.buffer),
+        },
       });
 
-      blobStream.on('finish', async () => {
-        try {
-          await blob.makePublic();
-          const publicUrl = `https://storage.googleapis.com/${this.bucket.name}/${fileName}`;
-          resolve({ success: true, url: publicUrl });
-        } catch (e) {
-          // Fallback nếu không make public được (do quyền)
-          const fallbackUrl = `https://firebasestorage.googleapis.com/v0/b/${this.bucket.name}/o/${encodeURIComponent(fileName)}?alt=media`;
-          resolve({ success: true, url: fallbackUrl });
-        }
+      const fileId = response.data.id;
+
+      // Cấp quyền public cho file
+      await this.drive.permissions.create({
+        fileId: fileId,
+        requestBody: {
+          role: 'reader',
+          type: 'anyone',
+        },
       });
 
-      blobStream.end(file.buffer);
-    });
+      // Link ảnh trực tiếp mà app có thể hiển thị được
+      const publicUrl = `https://lh3.googleusercontent.com/d/${fileId}=s1000`;
+      
+      return {
+        success: true,
+        url: publicUrl,
+        fileId: fileId,
+      };
+    } catch (error) {
+      console.error('Google Drive Upload Error:', error);
+      throw new BadRequestException('Failed to upload to Google Drive: ' + error.message);
+    }
   }
 }
