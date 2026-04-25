@@ -124,7 +124,8 @@ export class AiService {
       }
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:streamGenerateContent?key=${this.geminiApiKey}&alt=sse`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${this.geminiApiKey}&alt=sse`;
+
 
     const parts: any[] = [{ text: prompt }];
     if (image && mimeType) {
