@@ -49,14 +49,16 @@ export class UploadsController {
       throw new BadRequestException('File is required');
     }
     
-    // Tự động lấy Host của server (ví dụ Render) nếu không có biến môi trường
+    // Lấy host gốc (ví dụ: https://...onrender.com)
+    // Lưu ý: static assets thường nằm ở root, không nằm dưới /api/v1
     const protocol = request.protocol;
     const host = request.get('host');
-    const baseUrl = process.env.API_BASE_URL || `${protocol}://${host}`;
+    const rootUrl = `${protocol}://${host}`;
 
     return {
       success: true,
-      url: `${baseUrl}/${folder}/${file.filename}`,
+      url: `${rootUrl}/${folder}/${file.filename}`,
     };
+
   }
 }
