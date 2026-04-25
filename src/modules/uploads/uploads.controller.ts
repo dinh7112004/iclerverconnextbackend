@@ -22,24 +22,19 @@ export class UploadsController {
     if (this.drive) return;
 
     try {
-      const config = process.env.FIREBASE_CONFIG; // Dùng chung biến này cho tiện
-      let auth;
-      
-      if (config) {
-        const serviceAccount = JSON.parse(config);
-        auth = new google.auth.GoogleAuth({
-          credentials: serviceAccount,
-          scopes: ['https://www.googleapis.com/auth/drive.file'],
-        });
-      } else {
-        const serviceAccountPath = path.join(process.cwd(), 'firebase-service-account.json');
-        auth = new google.auth.GoogleAuth({
-          keyFile: serviceAccountPath,
-          scopes: ['https://www.googleapis.com/auth/drive.file'],
-        });
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+      if (!clientId || !clientSecret || !refreshToken) {
+        throw new Error('Missing Google OAuth2 credentials in environment variables');
       }
-      this.drive = google.drive({ version: 'v3', auth });
-      console.log('Google Drive API initialized');
+
+      const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
+      oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+      this.drive = google.drive({ version: 'v3', auth: oauth2Client });
+      console.log('Google Drive OAuth2 initialized');
     } catch (error) {
       console.error('Google Drive initialization error:', error.message);
     }
@@ -74,12 +69,12 @@ export class UploadsController {
     try {
       const fileName = `${folder}_${uuid()}${extname(file.originalname)}`;
       
-      // Upload file lên Google Drive vào thư mục được chỉ định
+      // 1. Upload file lên Google Drive
       const response = await this.drive.files.create({
         requestBody: {
           name: fileName,
           mimeType: file.mimetype,
-          parents: ['1q4kD7cjPcdu_ZfW_7j5nVu5UPkzQjVXr'], // ID thư mục mày vừa tạo
+          parents: ['1q4kD7cjPcdu_ZfW_7j5nVu5UPkzQjVXr'], // Giữ lại folder ID cũ của mày
         },
         media: {
           mimeType: file.mimetype,
@@ -89,7 +84,7 @@ export class UploadsController {
 
       const fileId = response.data.id;
 
-      // Cấp quyền public cho file
+      // 2. Cấp quyền public (ai có link cũng xem được)
       await this.drive.permissions.create({
         fileId: fileId,
         requestBody: {
@@ -98,8 +93,8 @@ export class UploadsController {
         },
       });
 
-      // Link ảnh trực tiếp mà app có thể hiển thị được
-      const publicUrl = `https://lh3.googleusercontent.com/d/${fileId}=s1000`;
+      // 3. Trả về link thumbnail (size 1000) để app hiển thị đẹp và nhanh
+      const publicUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
       
       return {
         success: true,
