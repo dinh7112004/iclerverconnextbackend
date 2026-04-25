@@ -115,7 +115,7 @@ export class StudentsController {
     @Body() updateStudentDto: UpdateStudentDto,
   ) {
     const student: any = await this.studentsService.findByUserId(userId);
-    return this.studentsService.update(student.id, updateStudentDto);
+    return this.studentsService.update(student.id, updateStudentDto, userId); // Truyền requestingUserId để invalidate đúng cache
   }
 
   @Patch(':id')

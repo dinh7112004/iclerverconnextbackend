@@ -12,7 +12,7 @@ async function bootstrap() {
   const userRepo = dataSource.getRepository(User);
   const studentRepo = dataSource.getRepository(Student);
 
-  const student = await studentRepo.findOne({ 
+  const student = await studentRepo.findOne({
     where: { id: 'a4777360-006b-41b4-870f-23d897277144' },
     relations: ['user']
   });

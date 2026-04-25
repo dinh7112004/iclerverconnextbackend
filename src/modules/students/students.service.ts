@@ -302,7 +302,7 @@ export class StudentsService {
     }
   }
 
-  async update(id: string, updateStudentDto: UpdateStudentDto) {
+  async update(id: string, updateStudentDto: UpdateStudentDto, requestingUserId?: string) {
     const student = await this.studentRepository.findOne({ where: { id } });
 
     if (!student) {
@@ -325,11 +325,18 @@ export class StudentsService {
       });
     }
 
-    // Invalidate cache
-    try {
-      await this.cacheManager.del(`student_profile_user_${student.userId}`);
-    } catch (err) {
-      console.warn(`[StudentsService] Failed to invalidate cache for User ${student.userId}`);
+    // Invalidate cache cho cả student và parent (nếu parent đang update)
+    const cacheKeysToDelete = [`student_profile_user_${student.userId}`];
+    if (requestingUserId && requestingUserId !== student.userId) {
+      cacheKeysToDelete.push(`student_profile_user_${requestingUserId}`);
+    }
+    for (const key of cacheKeysToDelete) {
+      try {
+        await this.cacheManager.del(key);
+        console.log(`[StudentsService] Cache invalidated: ${key}`);
+      } catch (err) {
+        console.warn(`[StudentsService] Failed to invalidate cache: ${key}`);
+      }
     }
 
     // Update health info if provided
