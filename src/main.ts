@@ -16,10 +16,7 @@ async function bootstrap() {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
 
-  app.useStaticAssets(join(__dirname, '..', 'public', 'uploads'), {
-    prefix: '/uploads/',
-  });
-
+  // Serve toàn bộ thư mục public (bao gồm /avatars, /homework, /others...)
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
   // Increase body limit

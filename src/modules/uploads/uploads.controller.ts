@@ -34,7 +34,7 @@ export class UploadsController {
         },
       }),
       fileFilter: (req, file, cb) => {
-        if (!file.originalname.match(/\.(jpg|jpeg|png|pdf)$/i)) {
+        if (!file.originalname.match(/\.(jpg|jpeg|png|gif|pdf)$/i)) {
           return cb(new BadRequestException('Only image and pdf files are allowed!'), false);
         }
         cb(null, true);
@@ -49,9 +49,9 @@ export class UploadsController {
       throw new BadRequestException('File is required');
     }
     
-    // Lấy host gốc (ví dụ: https://...onrender.com)
-    // Lưu ý: static assets thường nằm ở root, không nằm dưới /api/v1
-    const protocol = request.protocol;
+    // Fix: Render dùng proxy nên protocol có thể là http, phải đọc X-Forwarded-Proto
+    const forwardedProto = request.headers['x-forwarded-proto'];
+    const protocol = forwardedProto ? forwardedProto.split(',')[0].trim() : request.protocol;
     const host = request.get('host');
     const rootUrl = `${protocol}://${host}`;
 
