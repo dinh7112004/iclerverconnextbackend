@@ -40,9 +40,11 @@ export class NotificationsController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'skip', required: false, type: Number })
   @ApiQuery({ name: 'classId', required: false, type: String })
+  @ApiQuery({ name: 'priority', required: false, type: String })
   async getNotifications(
     @Request() req: any,
     @Query('status') status?: NotificationStatus,
+    @Query('priority') priority?: string,
     @Query('type') type?: NotificationType,
     @Query('limit') limit?: string,
     @Query('skip') skip?: string,
@@ -51,6 +53,7 @@ export class NotificationsController {
     const userId = req.user?.id || 'anonymous';
     return this.notificationsService.findByUser(userId, {
       status,
+      priority,
       type,
       limit: limit ? parseInt(limit) : undefined,
       skip: skip ? parseInt(skip) : undefined,

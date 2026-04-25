@@ -243,6 +243,7 @@ export class NotificationsService {
       limit?: number;
       skip?: number;
       classId?: string;
+      priority?: string;
     } = {},
   ): Promise<{ data: Notification[]; total: number }> {
     // Current user can see their own notifications AND global ones ('all')
@@ -252,6 +253,7 @@ export class NotificationsService {
 
     if (options.status) query.status = options.status;
     if (options.type) query.type = options.type;
+    if (options.priority) query.priority = options.priority;
 
     // If it's a class-specific activity request
     if (options.classId) {
