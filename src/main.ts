@@ -69,32 +69,31 @@ async function bootstrap() {
   // Global interceptors
   app.useGlobalInterceptors(new TransformInterceptor());
 
-  // Swagger documentation
-  if (configService.get('NODE_ENV') !== 'production') {
-    const config = new DocumentBuilder()
-      .setTitle('SLL Electronic System API')
-      .setDescription('Smart Electronic Communication Book System - AI Version')
-      .setVersion('1.0')
-      .addBearerAuth()
-      .addTag('auth', 'Authentication & Authorization')
-      .addTag('users', 'User Management')
-      .addTag('students', 'Student Management')
-      .addTag('teachers', 'Teacher Management')
-      .addTag('parents', 'Parent Management')
-      .addTag('classes', 'Class Management')
-      .addTag('attendance', 'Attendance Management')
-      .addTag('grades', 'Grades Management')
-      .addTag('homework', 'Homework Management')
-      .addTag('communication', 'Communication & Messaging')
-      .addTag('finance', 'Finance & Payments')
-      .addTag('materials', 'Learning Materials')
-      .addTag('ai', 'AI Services')
-      .addTag('reports', 'Reports & Analytics')
-      .build();
+  // Swagger documentation - Always enable for hand-off
+  const config = new DocumentBuilder()
+    .setTitle('SLL Electronic System API')
+    .setDescription('Smart Electronic Communication Book System - AI Version')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .addTag('auth', 'Authentication & Authorization')
+    .addTag('users', 'User Management')
+    .addTag('students', 'Student Management')
+    .addTag('teachers', 'Teacher Management')
+    .addTag('parents', 'Parent Management')
+    .addTag('classes', 'Class Management')
+    .addTag('attendance', 'Attendance Management')
+    .addTag('grades', 'Grades Management')
+    .addTag('homework', 'Homework Management')
+    .addTag('communication', 'Communication & Messaging')
+    .addTag('finance', 'Finance & Payments')
+    .addTag('materials', 'Learning Materials')
+    .addTag('ai', 'AI Services')
+    .addTag('reports', 'Reports & Analytics')
+    .build();
 
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document);
-  }
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
+
 
   const port = process.env.PORT || configService.get('API_PORT') || 3000;
   await app.listen(port);
