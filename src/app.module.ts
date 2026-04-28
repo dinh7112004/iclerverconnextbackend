@@ -11,6 +11,7 @@ import { redisStore } from 'cache-manager-redis-yet';
 import { createClient } from 'redis';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { KeepAliveService } from './common/services/keep-alive.service';
 import { typeOrmConfig } from './config/typeorm.config';
 import { mongooseConfig } from './config/mongoose.config';
 import { AuthModule } from './modules/auth/auth.module';
@@ -176,6 +177,6 @@ import { AiModule } from './modules/ai/ai.module';
     AiModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, KeepAliveService],
 })
 export class AppModule {}
