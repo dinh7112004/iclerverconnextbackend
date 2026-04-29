@@ -11,16 +11,17 @@ export class LibraryService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    try {
-      // Seed books if none exist
-      const count = await this.bookRepository.count();
-      if (count > 0) {
-        await this.bookRepository.clear(); // Xóa cũ để seed lại ảnh mới
+    // Đợi 5 giây để chắc chắn DB đã sẵn sàng trên Render
+    setTimeout(async () => {
+      try {
+        console.log('[Library] Forcing re-seed with online images...');
+        await this.bookRepository.delete({}); // Xóa sạch bảng
+        await this.seedBooks();
+        console.log('[Library] Re-seed completed successfully.');
+      } catch (error) {
+        console.error('[Library] Re-seed failed:', error.message);
       }
-      await this.seedBooks();
-    } catch (error) {
-      console.warn('[LibraryService] Table not ready yet, skipping seed.');
-    }
+    }, 5000);
   }
 
   private async seedBooks() {
