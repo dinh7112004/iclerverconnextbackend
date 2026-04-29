@@ -18,6 +18,17 @@ export class GamesController {
     return { success: true, data: questions };
   }
 
+  @Post('start')
+  @Version('1')
+  @ApiOperation({ summary: 'Bắt đầu game và trừ xu' })
+  async startGame(
+    @Body() body: { gameType: string; cost: number },
+    @Req() req: any
+  ) {
+    const userId = req.user.id;
+    return this.gamesService.startGame(userId, body.gameType, body.cost);
+  }
+
   @Post('finish')
   @Version('1')
   @ApiOperation({ summary: 'Ghi nhận kết quả chơi game và nhận thưởng' })

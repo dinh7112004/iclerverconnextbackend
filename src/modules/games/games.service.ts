@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
@@ -101,6 +101,30 @@ export class GamesService {
       formula,
       answer,
       options: options.sort(() => Math.random() - 0.5),
+    };
+  }
+
+  async startGame(userId: string, gameType: string, cost: number) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new BadRequestException('User not found');
+
+    if (user.coins < cost) {
+      throw new BadRequestException(
+        `Không đủ xu. Cần ${cost} xu, bạn đang có ${user.coins} xu.`
+      );
+    }
+
+    user.coins -= cost;
+    await this.userRepository.save(user);
+
+    this.logger.log(`[Game] User ${user.email} started ${gameType}. Deducted ${cost} coins. Remaining: ${user.coins}`);
+
+    return {
+      success: true,
+      data: {
+        remainingCoins: user.coins,
+        deductedCoins: cost,
+      },
     };
   }
 

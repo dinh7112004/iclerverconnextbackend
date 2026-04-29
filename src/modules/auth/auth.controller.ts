@@ -59,10 +59,17 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getProfile(@CurrentUser() user: User) {
     const profile = await this.authService.getProfile(user);
-    return {
-      success: true,
-      data: profile,
-    };
+    return { success: true, data: profile };
+  }
+
+  @Get('me/gamification')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get gamification level info for current user' })
+  @ApiResponse({ status: 200, description: 'Level info retrieved' })
+  async getGamification(@CurrentUser() user: User) {
+    const data = await this.authService.getGamification(user);
+    return { success: true, data };
   }
 
   @Post('change-password')
