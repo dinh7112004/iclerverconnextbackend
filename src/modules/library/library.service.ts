@@ -11,17 +11,14 @@ export class LibraryService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Đợi 5 giây để chắc chắn DB đã sẵn sàng trên Render
-    setTimeout(async () => {
-      try {
-        console.log('[Library] Forcing re-seed with online images...');
-        await this.bookRepository.delete({}); // Xóa sạch bảng
+    try {
+      const count = await this.bookRepository.count();
+      if (count === 0) {
         await this.seedBooks();
-        console.log('[Library] Re-seed completed successfully.');
-      } catch (error) {
-        console.error('[Library] Re-seed failed:', error.message);
       }
-    }, 5000);
+    } catch (error) {
+      console.warn('[LibraryService] Table not ready yet, skipping seed.');
+    }
   }
 
   private async seedBooks() {
@@ -30,7 +27,7 @@ export class LibraryService implements OnModuleInit {
         title: 'Toán học vui vẻ - Tập 1',
         author: 'Nguyễn Văn A',
         category: 'Sách giáo khoa',
-        imageUrl: 'https://images.unsplash.com/photo-1543004218-ee141104338e?q=80&w=1000&auto=format&fit=crop',
+        imageUrl: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?q=80&w=1000&auto=format&fit=crop',
         availability: 'Có sẵn',
         status: 'Sẵn sàng',
         description: 'Cuốn sách giúp bé làm quen với các con số và phép tính cơ bản một cách thú vị qua các hình minh họa sinh động.',
