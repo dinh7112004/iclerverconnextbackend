@@ -17,7 +17,11 @@ async function bootstrap() {
   });
 
   // Serve toàn bộ thư mục public (bao gồm /avatars, /homework, /others...)
-  app.useStaticAssets(join(process.cwd(), 'public'));
+  const publicPath = join(process.cwd(), 'public');
+  console.log(`[Static] Serving assets from: ${publicPath}`);
+  app.useStaticAssets(publicPath, {
+    prefix: '/',
+  });
 
   // Increase body limit
   app.use(json({ limit: '50mb' }));
