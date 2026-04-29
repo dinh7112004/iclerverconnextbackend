@@ -14,9 +14,10 @@ export class LibraryService implements OnModuleInit {
     try {
       // Seed books if none exist
       const count = await this.bookRepository.count();
-      if (count === 0) {
-        await this.seedBooks();
+      if (count > 0) {
+        await this.bookRepository.clear(); // Xóa cũ để seed lại ảnh mới
       }
+      await this.seedBooks();
     } catch (error) {
       console.warn('[LibraryService] Table not ready yet, skipping seed.');
     }
