@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import * as express from 'express';
 import { json, urlencoded } from 'express';
 import { join } from 'path';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
@@ -19,9 +20,11 @@ async function bootstrap() {
   // Serve toàn bộ thư mục public (bao gồm /avatars, /homework, /others...)
   const publicPath = join(process.cwd(), 'public');
   console.log(`[Static] Serving assets from: ${publicPath}`);
-  app.useStaticAssets(publicPath, {
-    prefix: '/',
-  });
+  
+  // Use express.static directly for more control
+  app.use('/', express.static(publicPath));
+  // Keep NestJS version as fallback
+  app.useStaticAssets(publicPath, { prefix: '/' });
 
   // Increase body limit
   app.use(json({ limit: '50mb' }));
