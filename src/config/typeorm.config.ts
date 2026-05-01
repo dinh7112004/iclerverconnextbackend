@@ -14,7 +14,7 @@ export const typeOrmConfig = (
     return url;
   })(),
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
-  synchronize: false,
+  synchronize: true,
   logging: false,
   ssl: false,
   schema: 'public',
