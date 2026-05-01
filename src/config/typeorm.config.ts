@@ -16,7 +16,7 @@ export const typeOrmConfig = (
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
   synchronize: false,
   logging: false,
-  ssl: configService.get('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: false,
   schema: 'public',
   extra: {
     max: 50,
